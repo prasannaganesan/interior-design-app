@@ -27,11 +27,6 @@ export function onnxPlugin(): Plugin {
       return {
         optimizeDeps: {
           exclude: ['onnxruntime-web']
-        },
-        resolve: {
-          alias: {
-            'onnxruntime-web': resolve(__dirname, 'node_modules/onnxruntime-web/dist/ort.all.min.js')
-          }
         }
       };
     }
