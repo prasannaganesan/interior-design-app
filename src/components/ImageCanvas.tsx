@@ -127,7 +127,6 @@ export default function ImageCanvas({ imageUrl, selectedColor }: ImageCanvasProp
     const scale = canvas.width / rect.width;
     const x = Math.round((e.clientX - rect.left) * scale);
     const y = Math.round((e.clientY - rect.top) * scale);
-
     const clampedX = Math.min(Math.max(x, 0), canvas.width - 1);
     const clampedY = Math.min(Math.max(y, 0), canvas.height - 1);
 
