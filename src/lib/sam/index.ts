@@ -17,6 +17,12 @@ export class SAM2 {
   private decoderSession: ort.InferenceSession | null = null;
   private imageEmbedding: ImageEmbedding | null = null;
   private modelConfig: SAMModelConfig;
+  // Store original image size and preprocessing parameters
+  private origWidth = 0;
+  private origHeight = 0;
+  private scale = 1;
+  private offsetX = 0;
+  private offsetY = 0;
   private static isInitialized = false;
 
   constructor(config: SAMModelConfig) {
@@ -81,10 +87,17 @@ export class SAM2 {
 
     try {
       console.log('Preprocessing image...');
-      const preprocessedImage = await this.preprocessImage(imageData);
+      const { tensor, scale, offsetX, offsetY } = await this.preprocessImage(imageData);
+
+      // Store original size and preprocessing params
+      this.origWidth = imageData.width;
+      this.origHeight = imageData.height;
+      this.scale = scale;
+      this.offsetX = offsetX;
+      this.offsetY = offsetY;
       
       console.log('Running encoder...');
-      const feeds = { image: preprocessedImage };
+      const feeds = { image: tensor };
       const results = await this.encoderSession.run(feeds);
 
       if (!results) {
@@ -114,9 +127,12 @@ export class SAM2 {
     try {
       console.log('Preparing inputs for mask generation...');
       // Prepare point input
+      // Convert point to preprocessing coordinates
+      const scaledX = point.x * this.scale + this.offsetX;
+      const scaledY = point.y * this.scale + this.offsetY;
       const pointCoords = new ort.Tensor(
         "float32",
-        [point.x, point.y],
+        [scaledX, scaledY],
         [1, 1, 2]
       );
       const pointLabels = new ort.Tensor("float32", [1], [1, 1]);
@@ -128,7 +144,11 @@ export class SAM2 {
         [1, 1, 256, 256]
       );
       const hasMaskInput = new ort.Tensor("float32", [0], [1]);
-      const origImSize = new ort.Tensor("int32", [1024, 1024], [2]);
+      const origImSize = new ort.Tensor(
+        "int32",
+        [this.origHeight, this.origWidth],
+        [2]
+      );
 
       console.log('Running decoder...');
       const feeds = {
@@ -160,7 +180,7 @@ export class SAM2 {
     }
   }
 
-  private async preprocessImage(imageData: ImageData): Promise<ort.Tensor> {
+  private async preprocessImage(imageData: ImageData): Promise<{ tensor: ort.Tensor; scale: number; offsetX: number; offsetY: number }> {
     try {
       // Create a canvas to resize the image
       const canvas = document.createElement('canvas');
@@ -203,7 +223,9 @@ export class SAM2 {
       }
 
       const float32Data = new Float32Array([...redArray, ...greenArray, ...blueArray]);
-      return new ort.Tensor("float32", float32Data, [1, 3, 1024, 1024]);
+      const tensor = new ort.Tensor("float32", float32Data, [1, 3, 1024, 1024]);
+
+      return { tensor, scale, offsetX: dx, offsetY: dy };
     } catch (error) {
       console.error('Error in preprocessImage:', error);
       throw new Error(`Failed to preprocess image: ${error instanceof Error ? error.message : 'Unknown error'}`);
