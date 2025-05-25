@@ -125,8 +125,10 @@ export default function ImageCanvas({ imageUrl, selectedColor }: ImageCanvasProp
 
     const rect = canvas.getBoundingClientRect();
     const scale = canvas.width / rect.width;
-    const x = Math.floor((e.clientX - rect.left) * scale);
-    const y = Math.floor((e.clientY - rect.top) * scale);
+    const x = Math.round((e.clientX - rect.left) * scale);
+    const y = Math.round((e.clientY - rect.top) * scale);
+    const clampedX = Math.min(Math.max(x, 0), canvas.width - 1);
+    const clampedY = Math.min(Math.max(y, 0), canvas.height - 1);
 
     if (hoverTimer.current) {
       clearTimeout(hoverTimer.current);
@@ -134,7 +136,7 @@ export default function ImageCanvas({ imageUrl, selectedColor }: ImageCanvasProp
 
     hoverTimer.current = window.setTimeout(async () => {
       try {
-        const mask = await sam.generateMask({ x, y });
+        const mask = await sam.generateMask({ x: clampedX, y: clampedY });
         showHoverMask(mask);
       } catch (err) {
         console.error('Failed to generate hover mask', err);
@@ -151,7 +153,10 @@ export default function ImageCanvas({ imageUrl, selectedColor }: ImageCanvasProp
     if (!base) return;
 
     ctx.putImageData(base, 0, 0);
-    const scaledMask = scaleImageData(mask, canvas.width, canvas.height);
+    const scaledMask =
+      mask.width === canvas.width && mask.height === canvas.height
+        ? mask
+        : scaleImageData(mask, canvas.width, canvas.height);
     const overlay = ctx.getImageData(0, 0, canvas.width, canvas.height);
     const data = overlay.data;
     const maskData = scaledMask.data;
@@ -192,11 +197,14 @@ export default function ImageCanvas({ imageUrl, selectedColor }: ImageCanvasProp
     try {
       const rect = canvas.getBoundingClientRect();
       const scale = canvas.width / rect.width;
-      const x = Math.floor((e.clientX - rect.left) * scale);
-      const y = Math.floor((e.clientY - rect.top) * scale);
+      const x = Math.round((e.clientX - rect.left) * scale);
+      const y = Math.round((e.clientY - rect.top) * scale);
+
+      const clampedX = Math.min(Math.max(x, 0), canvas.width - 1);
+      const clampedY = Math.min(Math.max(y, 0), canvas.height - 1);
 
       // Generate mask for clicked point
-      const mask = await sam.generateMask({ x, y });
+      const mask = await sam.generateMask({ x: clampedX, y: clampedY });
 
       // Apply the mask with selected color
       const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
@@ -208,7 +216,10 @@ export default function ImageCanvas({ imageUrl, selectedColor }: ImageCanvasProp
       const b = parseInt(selectedColor.slice(5, 7), 16);
 
       // Scale mask to canvas size if needed
-      const scaledMask = scaleImageData(mask, canvas.width, canvas.height);
+      const scaledMask =
+        mask.width === canvas.width && mask.height === canvas.height
+          ? mask
+          : scaleImageData(mask, canvas.width, canvas.height);
       const maskData = scaledMask.data;
 
       // Apply color where mask is non-zero
@@ -245,6 +256,9 @@ export default function ImageCanvas({ imageUrl, selectedColor }: ImageCanvasProp
   };
 
   const scaleImageData = (source: ImageData, targetWidth: number, targetHeight: number): ImageData => {
+    if (source.width === targetWidth && source.height === targetHeight) {
+      return source;
+    }
     const canvas = document.createElement('canvas');
     canvas.width = source.width;
     canvas.height = source.height;
@@ -260,6 +274,9 @@ export default function ImageCanvas({ imageUrl, selectedColor }: ImageCanvasProp
     tempCanvas.height = targetHeight;
     const tempCtx = tempCanvas.getContext('2d');
     if (!tempCtx) throw new Error('Failed to get temp canvas context');
+
+    // Disable smoothing for crisp mask edges
+    tempCtx.imageSmoothingEnabled = false;
 
     // Scale the image
     tempCtx.drawImage(canvas, 0, 0, targetWidth, targetHeight);
