@@ -35,8 +35,8 @@ export async function getModelFiles(modelInfo: ModelInfo): Promise<{ encoderPath
         const decoderPath = await getCachedModel(modelDir, modelInfo.decoderUrl, `${modelInfo.size}-decoder`);
         
         return { encoderPath, decoderPath };
-      } catch (e) {
-        console.warn('Failed to use Origin Private File System, falling back to direct downloads:', e);
+      } catch (err) {
+        console.warn('Failed to use Origin Private File System, falling back to direct downloads:', err);
       }
     }
 
@@ -80,7 +80,7 @@ async function getCachedModel(
     const file = await fileHandle.getFile();
     console.log(`Using cached model: ${filename}`);
     return URL.createObjectURL(file);
-  } catch (e) {
+  } catch {
     // File doesn't exist, download it
     console.log(`Downloading model ${filename}...`);
     const response = await fetch(url);

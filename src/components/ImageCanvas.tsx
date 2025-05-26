@@ -117,6 +117,59 @@ export default function ImageCanvas({ imageUrl, selectedColor }: ImageCanvasProp
 
   const hoverTimer = useRef<number | null>(null);
 
+  // Analyze connected regions in a mask for debugging purposes
+  const analyzeMask = (mask: ImageData) => {
+    const { width, height, data } = mask;
+    const visited = new Uint8Array(width * height);
+    const regions: { xMin: number; yMin: number; xMax: number; yMax: number; size: number }[] = [];
+    const queue: [number, number][] = [];
+    const idx = (x: number, y: number) => (y * width + x) * 4;
+
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const flat = y * width + x;
+        if (data[idx(x, y)] > 0 && !visited[flat]) {
+          let xMin = x;
+          let xMax = x;
+          let yMin = y;
+          let yMax = y;
+          let size = 0;
+          queue.push([x, y]);
+          visited[flat] = 1;
+
+          while (queue.length) {
+            const [qx, qy] = queue.pop()!;
+            size++;
+            xMin = Math.min(xMin, qx);
+            xMax = Math.max(xMax, qx);
+            yMin = Math.min(yMin, qy);
+            yMax = Math.max(yMax, qy);
+
+            const neighbors = [
+              [qx - 1, qy],
+              [qx + 1, qy],
+              [qx, qy - 1],
+              [qx, qy + 1]
+            ];
+            for (const [nx, ny] of neighbors) {
+              if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
+                const nFlat = ny * width + nx;
+                if (!visited[nFlat] && data[idx(nx, ny)] > 0) {
+                  visited[nFlat] = 1;
+                  queue.push([nx, ny]);
+                }
+              }
+            }
+          }
+
+          regions.push({ xMin, yMin, xMax, yMax, size });
+        }
+      }
+    }
+
+    return regions;
+  };
+
   const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
     if (!canvas || !sam) {
@@ -157,6 +210,8 @@ export default function ImageCanvas({ imageUrl, selectedColor }: ImageCanvasProp
       mask.width === canvas.width && mask.height === canvas.height
         ? mask
         : scaleImageData(mask, canvas.width, canvas.height);
+
+    console.log('Hover mask regions', analyzeMask(scaledMask));
     const overlay = ctx.getImageData(0, 0, canvas.width, canvas.height);
     const data = overlay.data;
     const maskData = scaledMask.data;
@@ -205,6 +260,7 @@ export default function ImageCanvas({ imageUrl, selectedColor }: ImageCanvasProp
 
       // Generate mask for clicked point
       const mask = await sam.generateMask({ x: clampedX, y: clampedY });
+      console.log('Raw mask regions', analyzeMask(mask));
 
       // Apply the mask with selected color
       const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
@@ -220,6 +276,7 @@ export default function ImageCanvas({ imageUrl, selectedColor }: ImageCanvasProp
         mask.width === canvas.width && mask.height === canvas.height
           ? mask
           : scaleImageData(mask, canvas.width, canvas.height);
+      console.log('Scaled mask regions', analyzeMask(scaledMask));
       const maskData = scaledMask.data;
 
       // Apply color where mask is non-zero

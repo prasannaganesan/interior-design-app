@@ -1,4 +1,3 @@
-import path from 'path';
 import webpack from 'webpack';
 import CopyPlugin from 'copy-webpack-plugin';
 
@@ -18,4 +17,6 @@ const config: webpack.Configuration = {
       ],
     }),
   ],
-}; 
+};
+
+export default config;
