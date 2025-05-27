@@ -173,7 +173,8 @@ export class SAM2 {
       const scores = result.iou_predictions.data;
       const bestMaskIdx = scores.indexOf(Math.max(...scores));
 
-      return this.postprocessMask(masks, bestMaskIdx);
+      const rawMask = this.postprocessMask(masks, bestMaskIdx);
+      return this.restoreMaskToOriginal(rawMask);
     } catch (error) {
       console.error('Error in generateMask:', error);
       throw new Error(`Failed to generate mask: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -256,4 +257,38 @@ export class SAM2 {
       throw new Error(`Failed to postprocess mask: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
-} 
+
+  private restoreMaskToOriginal(mask: ImageData): ImageData {
+    const maskScale = mask.width / 1024;
+    const cropX = Math.round(this.offsetX * maskScale);
+    const cropY = Math.round(this.offsetY * maskScale);
+    const cropW = Math.round(this.origWidth * this.scale * maskScale);
+    const cropH = Math.round(this.origHeight * this.scale * maskScale);
+
+    const srcCanvas = document.createElement('canvas');
+    srcCanvas.width = mask.width;
+    srcCanvas.height = mask.height;
+    const srcCtx = srcCanvas.getContext('2d');
+    if (!srcCtx) throw new Error('Failed to get canvas context');
+    srcCtx.putImageData(mask, 0, 0);
+
+    const dstCanvas = document.createElement('canvas');
+    dstCanvas.width = this.origWidth;
+    dstCanvas.height = this.origHeight;
+    const dstCtx = dstCanvas.getContext('2d');
+    if (!dstCtx) throw new Error('Failed to get canvas context');
+    dstCtx.imageSmoothingEnabled = false;
+    dstCtx.drawImage(
+      srcCanvas,
+      cropX,
+      cropY,
+      cropW,
+      cropH,
+      0,
+      0,
+      this.origWidth,
+      this.origHeight
+    );
+    return dstCtx.getImageData(0, 0, this.origWidth, this.origHeight);
+  }
+}
