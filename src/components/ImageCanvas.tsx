@@ -357,6 +357,7 @@ export default function ImageCanvas({ imageUrl, selectedColor }: ImageCanvasProp
     const Larr = new Float32Array(size);
     const Aarr = new Float32Array(size);
     const Barr = new Float32Array(size);
+    let sumL = 0;
     let sumA = 0;
     let sumB = 0;
     let sumGray = 0;
@@ -371,6 +372,7 @@ export default function ImageCanvas({ imageUrl, selectedColor }: ImageCanvasProp
         Larr[i] = L;
         Aarr[i] = a;
         Barr[i] = b;
+        sumL += L;
         sumA += a;
         sumB += b;
         sumGray += gray[i];
@@ -379,18 +381,25 @@ export default function ImageCanvas({ imageUrl, selectedColor }: ImageCanvasProp
     }
 
     if (count === 0) return;
+    const meanL = sumL / count;
     const meanA = sumA / count;
     const meanB = sumB / count;
     const meanGray = sumGray / count;
 
-    const [ , at, bt ] = hexToLab(colorHex);
+    const [Lt, at, bt] = hexToLab(colorHex);
+
+    // Scale lightness so that the wall's average reflectance matches
+    // the target paint. Without this adjustment, very dark colors like
+    // black appear washed out because the original wall was brighter.
 
     for (let i = 0, p = 0; i < size; i++, p += 4) {
       if (maskData[p] > 0) {
         const chromaScale = Math.min(Math.max(gray[i] / meanGray, 0.4), 1.0);
         const a = at + (Aarr[i] - meanA) * chromaScale;
         const b = bt + (Barr[i] - meanB) * chromaScale;
-        const [rLin, gLin, bLin] = labToLinearRgb(Larr[i], a, b);
+        const lightnessScale = meanL > 0 ? Lt / meanL : 1;
+        const L = Math.min(Math.max(Larr[i] * lightnessScale, 0), 100);
+        const [rLin, gLin, bLin] = labToLinearRgb(L, a, b);
         const shade = Math.exp(S_log[i]);
         const r = linearToSrgb(rLin * shade);
         const g = linearToSrgb(gLin * shade);
