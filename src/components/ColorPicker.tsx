@@ -208,7 +208,13 @@ export default function ColorPicker({ value, onChange }: ColorPickerProps) {
         onClick={() => setIsOpen(!isOpen)}
       />
       {isOpen && (
-        <div className="color-picker-popup">
+        <div
+          className="color-picker-popup"
+          onMouseDown={(e) => e.stopPropagation()}
+          onMouseMove={(e) => e.stopPropagation()}
+          onMouseUp={(e) => e.stopPropagation()}
+          onClick={(e) => e.stopPropagation()}
+        >
           <div 
             className="sv-picker"
             style={{ 
