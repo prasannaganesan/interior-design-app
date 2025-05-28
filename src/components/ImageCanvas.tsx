@@ -312,9 +312,12 @@ export default function ImageCanvas({ imageUrl, selectedColor }: ImageCanvasProp
       const mask = await sam.generateMask({ x: clampedX, y: clampedY });
       console.log('Raw mask regions', analyzeMask(mask));
 
-      // Apply the mask with selected color. We keep the luminance from the
-      // original image to preserve shadows and highlights for a more
-      // photo-realistic effect.
+      // Apply the mask with selected color. The goal is to replace the base
+      // hue while keeping the relative lightness differences that come from
+      // shadows and highlights.  To do this we estimate the average luminance
+      // of the selected region and treat deviations from that average as the
+      // shading factor.  The new color's luminance is then scaled by this
+      // factor so darker and lighter areas are preserved.
       const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
       const data = imageData.data;
 
@@ -325,7 +328,7 @@ export default function ImageCanvas({ imageUrl, selectedColor }: ImageCanvasProp
       const r = parseInt(selectedColor.slice(1, 3), 16);
       const g = parseInt(selectedColor.slice(3, 5), 16);
       const b = parseInt(selectedColor.slice(5, 7), 16);
-      const [h, s] = rgbToHsl(r, g, b);
+      const [h, s, targetL] = rgbToHsl(r, g, b);
 
       // Scale mask to canvas size if needed
       const scaledMask =
@@ -335,11 +338,25 @@ export default function ImageCanvas({ imageUrl, selectedColor }: ImageCanvasProp
       console.log('Scaled mask regions', analyzeMask(scaledMask));
       const maskData = scaledMask.data;
 
-      // Apply color where mask is non-zero while keeping original luminance
+      // First pass: compute average luminance of the masked region
+      let sumL = 0;
+      let count = 0;
       for (let i = 0; i < data.length; i += 4) {
         if (maskData[i] > 0) {
-          const [ , , l] = rgbToHsl(origData[i], origData[i + 1], origData[i + 2]);
-          const [nr, ng, nb] = hslToRgb(h, s, l);
+          const [, , l] = rgbToHsl(origData[i], origData[i + 1], origData[i + 2]);
+          sumL += l;
+          count++;
+        }
+      }
+      const avgL = count > 0 ? sumL / count : 0;
+
+      // Apply color while preserving shading relative to the average
+      for (let i = 0; i < data.length; i += 4) {
+        if (maskData[i] > 0) {
+          const [, , l] = rgbToHsl(origData[i], origData[i + 1], origData[i + 2]);
+          const shade = avgL > 0 ? l / avgL : 1;
+          const newL = Math.min(1, Math.max(0, targetL * shade));
+          const [nr, ng, nb] = hslToRgb(h, s, newL);
           data[i] = nr;
           data[i + 1] = ng;
           data[i + 2] = nb;
@@ -415,14 +432,28 @@ export default function ImageCanvas({ imageUrl, selectedColor }: ImageCanvasProp
     const r = parseInt(newColor.slice(1, 3), 16);
     const g = parseInt(newColor.slice(3, 5), 16);
     const b = parseInt(newColor.slice(5, 7), 16);
-    const [h, s] = rgbToHsl(r, g, b);
+    const [h, s, targetL] = rgbToHsl(r, g, b);
 
-    // Update all pixels in the wall
+    // Compute average luminance for the wall
+    let sumL = 0;
+    let count = 0;
     for (const pixelKey of wall.pixels) {
       const [x, y] = pixelKey.split(',').map(Number);
       const i = (y * canvas.width + x) * 4;
-      const [ , , l] = rgbToHsl(origData[i], origData[i + 1], origData[i + 2]);
-      const [nr, ng, nb] = hslToRgb(h, s, l);
+      const [, , l] = rgbToHsl(origData[i], origData[i + 1], origData[i + 2]);
+      sumL += l;
+      count++;
+    }
+    const avgL = count > 0 ? sumL / count : 0;
+
+    // Update all pixels in the wall using relative shading
+    for (const pixelKey of wall.pixels) {
+      const [x, y] = pixelKey.split(',').map(Number);
+      const i = (y * canvas.width + x) * 4;
+      const [, , l] = rgbToHsl(origData[i], origData[i + 1], origData[i + 2]);
+      const shade = avgL > 0 ? l / avgL : 1;
+      const newL = Math.min(1, Math.max(0, targetL * shade));
+      const [nr, ng, nb] = hslToRgb(h, s, newL);
       data[i] = nr;
       data[i + 1] = ng;
       data[i + 2] = nb;
