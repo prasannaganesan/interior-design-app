@@ -194,6 +194,28 @@ h2 {
   text-transform: uppercase;
 }
 
+.rgb-inputs {
+  display: flex;
+  gap: 4px;
+}
+
+.rgb-inputs input {
+  width: 40px;
+  padding: 4px 6px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-family: monospace;
+  text-align: center;
+}
+
+.eyedropper-button {
+  background: white;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  padding: 4px 6px;
+  cursor: pointer;
+}
+
 .hsv-controls {
   display: flex;
   flex-direction: column;
