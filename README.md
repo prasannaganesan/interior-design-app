@@ -8,6 +8,7 @@ This is a React + TypeScript application that uses Meta's Segment Anything Model
 - Real-time visualization of segmented objects
 - Browser-based ML inference using ONNX Runtime Web
 - Modern React + TypeScript + Vite setup
+- Photo-realistic recoloring that preserves surface shading
 
 ## Prerequisites
 
