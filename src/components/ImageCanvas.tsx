@@ -179,8 +179,8 @@ export default function ImageCanvas({ imageUrl, selectedColor }: ImageCanvasProp
     const rect = canvas.getBoundingClientRect();
     const scaleX = canvas.width / rect.width;
     const scaleY = canvas.height / rect.height;
-    const x = Math.round((e.clientX - rect.left) * scaleX);
-    const y = Math.round((e.clientY - rect.top) * scaleY);
+    const x = Math.round(e.nativeEvent.offsetX * scaleX);
+    const y = Math.round(e.nativeEvent.offsetY * scaleY);
     const clampedX = Math.min(Math.max(x, 0), canvas.width - 1);
     const clampedY = Math.min(Math.max(y, 0), canvas.height - 1);
 
@@ -254,8 +254,8 @@ export default function ImageCanvas({ imageUrl, selectedColor }: ImageCanvasProp
       const rect = canvas.getBoundingClientRect();
       const scaleX = canvas.width / rect.width;
       const scaleY = canvas.height / rect.height;
-      const x = Math.round((e.clientX - rect.left) * scaleX);
-      const y = Math.round((e.clientY - rect.top) * scaleY);
+      const x = Math.round(e.nativeEvent.offsetX * scaleX);
+      const y = Math.round(e.nativeEvent.offsetY * scaleY);
 
       const clampedX = Math.min(Math.max(x, 0), canvas.width - 1);
       const clampedY = Math.min(Math.max(y, 0), canvas.height - 1);
