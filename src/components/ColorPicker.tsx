@@ -84,9 +84,29 @@ const HSVToHex = (hsv: HSV): string => {
   return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
 };
 
+interface RGB {
+  r: number;
+  g: number;
+  b: number;
+}
+
+const hexToRGB = (hex: string): RGB => ({
+  r: parseInt(hex.slice(1, 3), 16),
+  g: parseInt(hex.slice(3, 5), 16),
+  b: parseInt(hex.slice(5, 7), 16)
+});
+
+const rgbToHex = ({ r, g, b }: RGB): string => {
+  const toHex = (n: number) => n.toString(16).padStart(2, '0');
+  return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+};
+
 export default function ColorPicker({ value, onChange }: ColorPickerProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [hsv, setHSV] = useState<HSV>(hexToHSV(value));
+  const [hexInput, setHexInput] = useState(value.toUpperCase());
+  const [rgb, setRgb] = useState<RGB>(hexToRGB(value));
+  const [supportsEyeDropper, setSupportsEyeDropper] = useState(false);
   const pickerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -96,6 +116,8 @@ export default function ColorPicker({ value, onChange }: ColorPickerProps) {
       newHSV.h = hsv.h;
     }
     setHSV(newHSV);
+    setHexInput(value.toUpperCase());
+    setRgb(hexToRGB(value));
   }, [value]);
 
   useEffect(() => {
@@ -107,6 +129,10 @@ export default function ColorPicker({ value, onChange }: ColorPickerProps) {
 
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  useEffect(() => {
+    setSupportsEyeDropper('EyeDropper' in window);
   }, []);
 
   const handleSVChange = (event: React.MouseEvent<HTMLDivElement>) => {
@@ -147,6 +173,31 @@ export default function ColorPicker({ value, onChange }: ColorPickerProps) {
   const getGradientColor = (s: number) => {
     const color = HSVToHex({ h: hsv.h, s, v: hsv.v });
     return color;
+  };
+
+  const handleHexInputChange = (newValue: string) => {
+    setHexInput(newValue);
+    if (/^#[0-9A-Fa-f]{6}$/.test(newValue)) {
+      onChange(newValue.toUpperCase());
+    }
+  };
+
+  const handleRgbChange = (channel: keyof RGB, value: number) => {
+    const newRgb = { ...rgb, [channel]: Math.max(0, Math.min(255, value)) };
+    setRgb(newRgb);
+    onChange(rgbToHex(newRgb));
+  };
+
+  const openEyeDropper = async () => {
+    if (!supportsEyeDropper) return;
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const eyeDropper = new (window as any).EyeDropper();
+      const result = await eyeDropper.open();
+      onChange(result.sRGBHex);
+    } catch {
+      // ignore cancellation errors
+    }
   };
 
   return (
@@ -238,14 +289,37 @@ export default function ColorPicker({ value, onChange }: ColorPickerProps) {
           <div className="color-info">
             <input
               type="text"
-              value={value.toUpperCase()}
-              onChange={(e) => {
-                const newValue = e.target.value;
-                if (/^#[0-9A-Fa-f]{6}$/.test(newValue)) {
-                  onChange(newValue);
-                }
-              }}
+              value={hexInput}
+              onChange={(e) => handleHexInputChange(e.target.value)}
             />
+            <div className="rgb-inputs">
+              <input
+                type="number"
+                min="0"
+                max="255"
+                value={rgb.r}
+                onChange={(e) => handleRgbChange('r', Number(e.target.value))}
+              />
+              <input
+                type="number"
+                min="0"
+                max="255"
+                value={rgb.g}
+                onChange={(e) => handleRgbChange('g', Number(e.target.value))}
+              />
+              <input
+                type="number"
+                min="0"
+                max="255"
+                value={rgb.b}
+                onChange={(e) => handleRgbChange('b', Number(e.target.value))}
+              />
+            </div>
+            {supportsEyeDropper && (
+              <button className="eyedropper-button" onClick={openEyeDropper}>
+                🎨
+              </button>
+            )}
           </div>
         </div>
       )}
