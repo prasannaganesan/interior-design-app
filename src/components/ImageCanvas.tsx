@@ -2,6 +2,54 @@ import { useEffect, useRef, useState } from 'react';
 import { SAM2 } from '../lib/sam';
 import { AVAILABLE_MODELS, getModelFiles } from '../lib/sam/model-loader';
 
+// Utility functions to convert between RGB and HSL. These are used to
+// preserve the original luminance of the surface when applying a new color.
+const rgbToHsl = (r: number, g: number, b: number): [number, number, number] => {
+  r /= 255; g /= 255; b /= 255;
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  let h = 0; let s = 0; const l = (max + min) / 2;
+  if (max !== min) {
+    const d = max - min;
+    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+    switch (max) {
+      case r:
+        h = (g - b) / d + (g < b ? 6 : 0);
+        break;
+      case g:
+        h = (b - r) / d + 2;
+        break;
+      default:
+        h = (r - g) / d + 4;
+    }
+    h /= 6;
+  }
+  return [h * 360, s, l];
+};
+
+const hslToRgb = (h: number, s: number, l: number): [number, number, number] => {
+  h /= 360;
+  let r: number; let g: number; let b: number;
+  if (s === 0) {
+    r = g = b = l; // achromatic
+  } else {
+    const hue2rgb = (p: number, q: number, t: number): number => {
+      if (t < 0) t += 1;
+      if (t > 1) t -= 1;
+      if (t < 1 / 6) return p + (q - p) * 6 * t;
+      if (t < 1 / 2) return q;
+      if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
+      return p;
+    };
+    const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+    const p = 2 * l - q;
+    r = hue2rgb(p, q, h + 1 / 3);
+    g = hue2rgb(p, q, h);
+    b = hue2rgb(p, q, h - 1 / 3);
+  }
+  return [Math.round(r * 255), Math.round(g * 255), Math.round(b * 255)];
+};
+
 interface ImageCanvasProps {
   imageUrl: string;
   selectedColor: string;
@@ -264,14 +312,20 @@ export default function ImageCanvas({ imageUrl, selectedColor }: ImageCanvasProp
       const mask = await sam.generateMask({ x: clampedX, y: clampedY });
       console.log('Raw mask regions', analyzeMask(mask));
 
-      // Apply the mask with selected color
+      // Apply the mask with selected color. We keep the luminance from the
+      // original image to preserve shadows and highlights for a more
+      // photo-realistic effect.
       const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
       const data = imageData.data;
 
-      // Convert hex to RGB
+      if (!originalImageData) return;
+      const origData = originalImageData.data;
+
+      // Convert hex to RGB and then to HSL for easier luminance manipulation
       const r = parseInt(selectedColor.slice(1, 3), 16);
       const g = parseInt(selectedColor.slice(3, 5), 16);
       const b = parseInt(selectedColor.slice(5, 7), 16);
+      const [h, s] = rgbToHsl(r, g, b);
 
       // Scale mask to canvas size if needed
       const scaledMask =
@@ -281,12 +335,14 @@ export default function ImageCanvas({ imageUrl, selectedColor }: ImageCanvasProp
       console.log('Scaled mask regions', analyzeMask(scaledMask));
       const maskData = scaledMask.data;
 
-      // Apply color where mask is non-zero
+      // Apply color where mask is non-zero while keeping original luminance
       for (let i = 0; i < data.length; i += 4) {
         if (maskData[i] > 0) {
-          data[i] = r;
-          data[i + 1] = g;
-          data[i + 2] = b;
+          const [ , , l] = rgbToHsl(origData[i], origData[i + 1], origData[i + 2]);
+          const [nr, ng, nb] = hslToRgb(h, s, l);
+          data[i] = nr;
+          data[i + 1] = ng;
+          data[i + 2] = nb;
         }
       }
 
@@ -352,18 +408,24 @@ export default function ImageCanvas({ imageUrl, selectedColor }: ImageCanvasProp
     const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
     const data = imageData.data;
 
+    if (!originalImageData) return;
+    const origData = originalImageData.data;
+
     // Convert hex to RGB
     const r = parseInt(newColor.slice(1, 3), 16);
     const g = parseInt(newColor.slice(3, 5), 16);
     const b = parseInt(newColor.slice(5, 7), 16);
+    const [h, s] = rgbToHsl(r, g, b);
 
     // Update all pixels in the wall
     for (const pixelKey of wall.pixels) {
       const [x, y] = pixelKey.split(',').map(Number);
       const i = (y * canvas.width + x) * 4;
-      data[i] = r;
-      data[i + 1] = g;
-      data[i + 2] = b;
+      const [ , , l] = rgbToHsl(origData[i], origData[i + 1], origData[i + 2]);
+      const [nr, ng, nb] = hslToRgb(h, s, l);
+      data[i] = nr;
+      data[i + 1] = ng;
+      data[i + 2] = nb;
     }
 
     ctx.putImageData(imageData, 0, 0);
