@@ -49,6 +49,12 @@ export default function ImageCanvas({ imageUrl, selectedColor }: ImageCanvasProp
   const [groups, setGroups] = useState<WallGroup[]>([]);
   const [selectedWall, setSelectedWall] = useState<string | null>(null);
 
+  // Radius used for the Retinex illumination estimate. A smaller
+  // radius reduces over-blurring which previously caused the wall's
+  // mean lightness to become unrealistically small and led to washed
+  // out recoloring.
+  const RETINEX_BLUR_RADIUS = 15;
+
   // Initialize SAM2
   useEffect(() => {
     async function initSAM() {
@@ -407,7 +413,7 @@ export default function ImageCanvas({ imageUrl, selectedColor }: ImageCanvasProp
       logL[i] = Math.log(lum + 1e-6);
     }
 
-    const S_log = boxBlurFloat(logL, width, height, 45);
+    const S_log = boxBlurFloat(logL, width, height, RETINEX_BLUR_RADIUS);
 
     const Larr = new Float32Array(size);
     const Aarr = new Float32Array(size);
@@ -452,7 +458,10 @@ export default function ImageCanvas({ imageUrl, selectedColor }: ImageCanvasProp
         const chromaScale = Math.min(Math.max(gray[i] / meanGray, 0.4), 1.0);
         const a = at + (Aarr[i] - meanA) * chromaScale;
         const b = bt + (Barr[i] - meanB) * chromaScale;
-        const lightnessScale = meanL > 0 ? Lt / meanL : 1;
+        // Avoid extreme scaling when the estimated mean lightness is
+        // very small which previously produced near-white results.
+        const rawScale = meanL > 0 ? Lt / meanL : 1;
+        const lightnessScale = Math.min(rawScale, 5);
         const L = Math.min(Math.max(Larr[i] * lightnessScale, 0), 100);
         const [rLin, gLin, bLin] = labToLinearRgb(L, a, b);
         const shade = Math.exp(S_log[i]);
