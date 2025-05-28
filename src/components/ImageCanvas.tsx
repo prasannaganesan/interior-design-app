@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import ColorPicker from './ColorPicker';
 import { SAM2 } from '../lib/sam';
 import { AVAILABLE_MODELS, getModelFiles } from '../lib/sam/model-loader';
 import {
@@ -25,6 +26,14 @@ interface WallSurface {
   id: string;
   pixels: Set<string>;
   color: string;
+  enabled: boolean;
+  groupId: string | null;
+}
+
+interface WallGroup {
+  id: string;
+  name: string;
+  color: string;
 }
 
 
@@ -37,6 +46,7 @@ export default function ImageCanvas({ imageUrl, selectedColor }: ImageCanvasProp
   const [isProcessing, setIsProcessing] = useState(false);
   const [status, setStatus] = useState<string>('');
   const [walls, setWalls] = useState<WallSurface[]>([]);
+  const [groups, setGroups] = useState<WallGroup[]>([]);
   const [selectedWall, setSelectedWall] = useState<string | null>(null);
 
   // Initialize SAM2
@@ -93,6 +103,7 @@ export default function ImageCanvas({ imageUrl, selectedColor }: ImageCanvasProp
       
       // Reset walls when loading new image
       setWalls([]);
+      setGroups([]);
       setSelectedWall(null);
       
       // Generate embeddings for SAM
@@ -244,6 +255,10 @@ export default function ImageCanvas({ imageUrl, selectedColor }: ImageCanvasProp
     if (!ctx) return;
     const base = history[currentHistoryIndex]?.imageData;
     if (base) ctx.putImageData(base, 0, 0);
+    if (hoverTimer.current) {
+      clearTimeout(hoverTimer.current);
+      hoverTimer.current = null;
+    }
   };
 
   const handleMouseDown = async (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -279,6 +294,16 @@ export default function ImageCanvas({ imageUrl, selectedColor }: ImageCanvasProp
           : scaleImageData(mask, canvas.width, canvas.height);
       console.log('Scaled mask regions', analyzeMask(scaledMask));
       applyRetinexRecolor(scaledMask, selectedColor);
+
+      const newWall: WallSurface = {
+        id: `wall-${Date.now()}`,
+        pixels: maskToPixelSet(scaledMask),
+        color: selectedColor,
+        enabled: true,
+        groupId: null
+      };
+      setWalls([...walls, newWall]);
+      setSelectedWall(newWall.id);
 
       // Save to history
       saveToHistory();
@@ -317,6 +342,36 @@ export default function ImageCanvas({ imageUrl, selectedColor }: ImageCanvasProp
     // Scale the image
     tempCtx.drawImage(canvas, 0, 0, targetWidth, targetHeight);
     return tempCtx.getImageData(0, 0, targetWidth, targetHeight);
+  };
+
+  const maskToPixelSet = (mask: ImageData): Set<string> => {
+    const pixels = new Set<string>();
+    const { width, height, data } = mask;
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const i = (y * width + x) * 4;
+        if (data[i] > 0) {
+          pixels.add(`${x},${y}`);
+        }
+      }
+    }
+    return pixels;
+  };
+
+  const wallToMask = (wall: WallSurface): ImageData => {
+    const canvas = canvasRef.current;
+    if (!canvas) throw new Error('Canvas not available');
+    const mask = new ImageData(canvas.width, canvas.height);
+    const data = mask.data;
+    for (const key of wall.pixels) {
+      const [x, y] = key.split(',').map(Number);
+      const idx = (y * canvas.width + x) * 4;
+      data[idx] = 255;
+      data[idx + 1] = 255;
+      data[idx + 2] = 255;
+      data[idx + 3] = 255;
+    }
+    return mask;
   };
 
   const applyRetinexRecolor = (mask: ImageData, colorHex: string) => {
@@ -434,6 +489,22 @@ export default function ImageCanvas({ imageUrl, selectedColor }: ImageCanvasProp
     saveToHistory();
   };
 
+  const reapplyWalls = (wallList: WallSurface[] = walls) => {
+    const canvas = canvasRef.current;
+    if (!canvas || !originalImageData) return;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    ctx.putImageData(originalImageData, 0, 0);
+    for (const wall of wallList) {
+      if (!wall.enabled) continue;
+      const mask = wallToMask(wall);
+      const color = wall.color;
+      applyRetinexRecolor(mask, color);
+    }
+  };
+
   const saveToHistory = () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -487,6 +558,42 @@ export default function ImageCanvas({ imageUrl, selectedColor }: ImageCanvasProp
     }
   };
 
+  const toggleWall = (id: string) => {
+    const updated = walls.map(w =>
+      w.id === id ? { ...w, enabled: !w.enabled } : w
+    );
+    setWalls(updated);
+    reapplyWalls(updated);
+    saveToHistory();
+  };
+
+  const addGroup = () => {
+    const name = prompt('Group name?');
+    if (!name) return;
+    const id = `group-${Date.now()}`;
+    const group: WallGroup = { id, name, color: selectedColor };
+    setGroups([...groups, group]);
+  };
+
+  const assignWallToGroup = (wallId: string, groupId: string | null) => {
+    const updated = walls.map(w =>
+      w.id === wallId ? { ...w, groupId, color: groupId ? (groups.find(g => g.id === groupId)?.color || w.color) : w.color } : w
+    );
+    setWalls(updated);
+    reapplyWalls(updated);
+    saveToHistory();
+  };
+
+  const updateGroupColor = (groupId: string, color: string) => {
+    setGroups(groups.map(g => g.id === groupId ? { ...g, color } : g));
+    const updated = walls.map(w =>
+      w.groupId === groupId ? { ...w, color } : w
+    );
+    setWalls(updated);
+    reapplyWalls(updated);
+    saveToHistory();
+  };
+
   const reset = () => {
     const canvas = canvasRef.current;
     if (!canvas || !originalImageData) return;
@@ -498,6 +605,7 @@ export default function ImageCanvas({ imageUrl, selectedColor }: ImageCanvasProp
     setHistory([{ imageData: originalImageData, timestamp: Date.now() }]);
     setCurrentHistoryIndex(0);
     setWalls([]);
+    setGroups([]);
     setSelectedWall(null);
   };
 
@@ -511,6 +619,30 @@ export default function ImageCanvas({ imageUrl, selectedColor }: ImageCanvasProp
           <button onClick={() => setSelectedWall(null)}>Deselect Wall</button>
         )}
         <span className="status">{status}</span>
+      </div>
+      <div className="wall-list">
+        {walls.map(w => (
+          <div key={w.id} className="wall-item">
+            <label>
+              <input type="checkbox" checked={w.enabled} onChange={() => toggleWall(w.id)} /> {w.id}
+            </label>
+            <select value={w.groupId || ''} onChange={e => assignWallToGroup(w.id, e.target.value || null)}>
+              <option value="">No group</option>
+              {groups.map(g => (
+                <option key={g.id} value={g.id}>{g.name}</option>
+              ))}
+            </select>
+          </div>
+        ))}
+      </div>
+      <div className="group-list">
+        <button onClick={addGroup}>Add Group</button>
+        {groups.map(g => (
+          <div key={g.id} className="group-item">
+            <span>{g.name}</span>
+            <ColorPicker value={g.color} onChange={c => updateGroupColor(g.id, c)} />
+          </div>
+        ))}
       </div>
       <canvas
         ref={canvasRef}

@@ -417,3 +417,16 @@ h2 {
   cursor: pointer;
   transform: translateY(-4px);
 }
+
+.wall-list, .group-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 8px 0;
+}
+
+.wall-item, .group-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
