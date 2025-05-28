@@ -259,11 +259,12 @@ export class SAM2 {
   }
 
   private restoreMaskToOriginal(mask: ImageData): ImageData {
-    const maskScale = mask.width / 1024;
-    const cropX = Math.round(this.offsetX * maskScale);
-    const cropY = Math.round(this.offsetY * maskScale);
-    const cropW = Math.round(this.origWidth * this.scale * maskScale);
-    const cropH = Math.round(this.origHeight * this.scale * maskScale);
+    const maskScaleX = mask.width / 1024;
+    const maskScaleY = mask.height / 1024;
+    const cropX = Math.round(this.offsetX * maskScaleX);
+    const cropY = Math.round(this.offsetY * maskScaleY);
+    const cropW = Math.round(this.origWidth * this.scale * maskScaleX);
+    const cropH = Math.round(this.origHeight * this.scale * maskScaleY);
 
     const srcCanvas = document.createElement('canvas');
     srcCanvas.width = mask.width;
