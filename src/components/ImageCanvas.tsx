@@ -593,7 +593,11 @@ export default function ImageCanvas({ imageUrl, selectedColor }: ImageCanvasProp
     saveToHistory();
   };
 
-  const updateGroupColor = (groupId: string, color: string) => {
+  const previewGroupColor = (groupId: string, color: string) => {
+    setGroups(groups.map(g => g.id === groupId ? { ...g, color } : g));
+  };
+
+  const commitGroupColor = (groupId: string, color: string) => {
     setGroups(groups.map(g => g.id === groupId ? { ...g, color } : g));
     const updated = walls.map(w =>
       w.groupId === groupId ? { ...w, color } : w
@@ -649,7 +653,11 @@ export default function ImageCanvas({ imageUrl, selectedColor }: ImageCanvasProp
         {groups.map(g => (
           <div key={g.id} className="group-item">
             <span>{g.name}</span>
-            <ColorPicker value={g.color} onChange={c => updateGroupColor(g.id, c)} />
+            <ColorPicker
+              value={g.color}
+              onChange={c => previewGroupColor(g.id, c)}
+              onChangeComplete={c => commitGroupColor(g.id, c)}
+            />
           </div>
         ))}
       </div>
