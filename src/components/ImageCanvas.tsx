@@ -11,9 +11,54 @@ import {
   boxBlurFloat
 } from '../lib/color';
 
+import { type WhiteBalance } from './WhiteBalanceControls';
+
+interface LightingPreset {
+  r: number;
+  g: number;
+  b: number;
+  brightness: number;
+}
+
+const LIGHTING_SETTINGS: Record<string, LightingPreset> = {
+  normal: { r: 1, g: 1, b: 1, brightness: 1 },
+  morning: { r: 1.1, g: 1.05, b: 0.95, brightness: 1.1 },
+  afternoon: { r: 1, g: 1, b: 1, brightness: 1.15 },
+  evening: { r: 1.15, g: 0.95, b: 0.85, brightness: 0.9 },
+  night: { r: 1.2, g: 1, b: 0.8, brightness: 0.5 },
+  cloudy: { r: 0.95, g: 1, b: 1.1, brightness: 0.9 }
+};
+
+function applyWhiteBalance(image: ImageData, wb: WhiteBalance): ImageData {
+  const out = new Uint8ClampedArray(image.data.length);
+  for (let i = 0; i < image.data.length; i += 4) {
+    out[i] = Math.min(255, image.data[i] * wb.r);
+    out[i + 1] = Math.min(255, image.data[i + 1] * wb.g);
+    out[i + 2] = Math.min(255, image.data[i + 2] * wb.b);
+    out[i + 3] = image.data[i + 3];
+  }
+  return new ImageData(out, image.width, image.height);
+}
+
+function applyLighting(ctx: CanvasRenderingContext2D, width: number, height: number, mode: string) {
+  const preset = LIGHTING_SETTINGS[mode];
+  if (!preset || mode === 'normal') return;
+  const img = ctx.getImageData(0, 0, width, height);
+  const { r, g, b, brightness } = preset;
+  const data = img.data;
+  for (let i = 0; i < data.length; i += 4) {
+    data[i] = Math.min(255, data[i] * r * brightness);
+    data[i + 1] = Math.min(255, data[i + 1] * g * brightness);
+    data[i + 2] = Math.min(255, data[i + 2] * b * brightness);
+  }
+  ctx.putImageData(img, 0, 0);
+}
+
 interface ImageCanvasProps {
   imageUrl: string;
   selectedColor: string;
+  whiteBalance: WhiteBalance;
+  lighting: string;
 }
 
 interface HistoryState {
@@ -37,8 +82,9 @@ interface WallGroup {
 }
 
 
-export default function ImageCanvas({ imageUrl, selectedColor }: ImageCanvasProps) {
+export default function ImageCanvas({ imageUrl, selectedColor, whiteBalance, lighting }: ImageCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [rawImageData, setRawImageData] = useState<ImageData | null>(null);
   const [originalImageData, setOriginalImageData] = useState<ImageData | null>(null);
   const [history, setHistory] = useState<HistoryState[]>([]);
   const [currentHistoryIndex, setCurrentHistoryIndex] = useState(-1);
@@ -99,19 +145,28 @@ export default function ImageCanvas({ imageUrl, selectedColor }: ImageCanvasProp
 
     const image = new Image();
     image.src = imageUrl;
-    image.onload = async () => {
-      // Set canvas size to match image
+    image.onload = () => {
       canvas.width = image.width;
       canvas.height = image.height;
-      
-      // Draw image
       ctx.drawImage(image, 0, 0);
-      
-      // Store original image data
-      const initialImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      setOriginalImageData(initialImageData);
+      const rawData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      setRawImageData(rawData);
+    };
+  }, [imageUrl]);
 
-      const { data } = initialImageData;
+  useEffect(() => {
+    async function process() {
+      const canvas = canvasRef.current;
+      if (!canvas || !rawImageData) return;
+
+      const ctx = canvas.getContext('2d', { willReadFrequently: true });
+      if (!ctx) return;
+
+      const balancedData = applyWhiteBalance(rawImageData, whiteBalance);
+      setOriginalImageData(balancedData);
+      ctx.putImageData(balancedData, 0, 0);
+
+      const { data } = balancedData;
       const size = canvas.width * canvas.height;
       const logR = new Float32Array(size);
       const logG = new Float32Array(size);
@@ -150,23 +205,21 @@ export default function ImageCanvas({ imageUrl, selectedColor }: ImageCanvasProp
       }
 
       retinexRef.current = { L, A, B, gray, shade };
-      
-      // Initialize history with original image
-      setHistory([{ imageData: initialImageData, timestamp: Date.now() }]);
+
+      setHistory([{ imageData: balancedData, timestamp: Date.now() }]);
       setCurrentHistoryIndex(0);
-      
-      // Reset walls when loading new image
+
       setWalls([]);
       setGroups([]);
       setSelectedWall(null);
-      
-      // Generate embeddings for SAM
+
       if (sam) {
         try {
           setStatus('Generating image embeddings...');
           setIsProcessing(true);
-          await sam.generateEmbedding(initialImageData);
+          await sam.generateEmbedding(balancedData);
           setStatus('Ready');
+          applyLighting(ctx, canvas.width, canvas.height, lighting);
         } catch (error) {
           console.error('Failed to generate embeddings:', error);
           setStatus('Failed to generate embeddings');
@@ -174,8 +227,9 @@ export default function ImageCanvas({ imageUrl, selectedColor }: ImageCanvasProp
           setIsProcessing(false);
         }
       }
-    };
-  }, [imageUrl, sam]);
+    }
+    process();
+  }, [rawImageData, whiteBalance, sam, lighting]);
 
   useEffect(() => {
     // Update wall color when selected color changes and a wall is selected
@@ -474,6 +528,11 @@ export default function ImageCanvas({ imageUrl, selectedColor }: ImageCanvasProp
     applyRetinexRecolor(wall.pixels, newColor);
     wall.color = newColor;
     setWalls(walls.map(w => w.id === wall.id ? wall : w));
+    const canvas = canvasRef.current;
+    if (canvas) {
+      const ctx = canvas.getContext('2d');
+      if (ctx) applyLighting(ctx, canvas.width, canvas.height, lighting);
+    }
     saveToHistory();
   };
 
@@ -489,6 +548,7 @@ export default function ImageCanvas({ imageUrl, selectedColor }: ImageCanvasProp
       if (!wall.enabled) continue;
       applyRetinexRecolor(wall.pixels, wall.color);
     }
+    applyLighting(ctx, canvas.width, canvas.height, lighting);
   };
 
   const saveToHistory = () => {
@@ -526,6 +586,7 @@ export default function ImageCanvas({ imageUrl, selectedColor }: ImageCanvasProp
 
       const newIndex = currentHistoryIndex - 1;
       ctx.putImageData(history[newIndex].imageData, 0, 0);
+      applyLighting(ctx, canvas.width, canvas.height, lighting);
       setCurrentHistoryIndex(newIndex);
     }
   };
@@ -540,6 +601,7 @@ export default function ImageCanvas({ imageUrl, selectedColor }: ImageCanvasProp
 
       const newIndex = currentHistoryIndex + 1;
       ctx.putImageData(history[newIndex].imageData, 0, 0);
+      applyLighting(ctx, canvas.width, canvas.height, lighting);
       setCurrentHistoryIndex(newIndex);
     }
   };
@@ -604,6 +666,12 @@ export default function ImageCanvas({ imageUrl, selectedColor }: ImageCanvasProp
     setGroups([]);
     setSelectedWall(null);
   };
+
+  useEffect(() => {
+    if (originalImageData) {
+      reapplyWalls();
+    }
+  }, [lighting]);
 
   return (
     <div className="canvas-wrapper">
