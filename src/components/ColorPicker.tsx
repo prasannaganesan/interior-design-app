@@ -3,6 +3,7 @@ import { useState, useEffect, useRef } from 'react';
 interface ColorPickerProps {
   value: string;
   onChange: (color: string) => void;
+  onChangeComplete?: (color: string) => void;
 }
 
 interface HSV {
@@ -101,13 +102,22 @@ const rgbToHex = ({ r, g, b }: RGB): string => {
   return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
 };
 
-export default function ColorPicker({ value, onChange }: ColorPickerProps) {
+export default function ColorPicker({ value, onChange, onChangeComplete }: ColorPickerProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [hsv, setHSV] = useState<HSV>(hexToHSV(value));
   const [hexInput, setHexInput] = useState(value.toUpperCase());
   const [rgb, setRgb] = useState<RGB>(hexToRGB(value));
   const [supportsEyeDropper, setSupportsEyeDropper] = useState(false);
   const pickerRef = useRef<HTMLDivElement>(null);
+  const wasOpen = useRef(false);
+
+  // Notify parent when the user closes the picker
+  useEffect(() => {
+    if (wasOpen.current && !isOpen) {
+      onChangeComplete?.(HSVToHex(hsv));
+    }
+    wasOpen.current = isOpen;
+  }, [isOpen, hsv, onChangeComplete]);
 
   useEffect(() => {
     const newHSV = hexToHSV(value);
