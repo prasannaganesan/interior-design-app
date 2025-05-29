@@ -24,7 +24,7 @@ interface HistoryState {
 
 interface WallSurface {
   id: string;
-  pixels: Set<string>;
+  pixels: Uint32Array;
   color: string;
   enabled: boolean;
   groupId: string | null;
@@ -48,6 +48,14 @@ export default function ImageCanvas({ imageUrl, selectedColor }: ImageCanvasProp
   const [walls, setWalls] = useState<WallSurface[]>([]);
   const [groups, setGroups] = useState<WallGroup[]>([]);
   const [selectedWall, setSelectedWall] = useState<string | null>(null);
+
+  const retinexRef = useRef<{
+    L: Float32Array;
+    A: Float32Array;
+    B: Float32Array;
+    gray: Float32Array;
+    shade: Float32Array;
+  } | null>(null);
 
   // Radius used for the Retinex illumination estimate. A smaller
   // radius reduces over-blurring which previously caused the wall's
@@ -102,6 +110,46 @@ export default function ImageCanvas({ imageUrl, selectedColor }: ImageCanvasProp
       // Store original image data
       const initialImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
       setOriginalImageData(initialImageData);
+
+      const { data } = initialImageData;
+      const size = canvas.width * canvas.height;
+      const logR = new Float32Array(size);
+      const logG = new Float32Array(size);
+      const logB = new Float32Array(size);
+      const logL = new Float32Array(size);
+      const gray = new Float32Array(size);
+
+      for (let i = 0, p = 0; i < size; i++, p += 4) {
+        const rl = srgbToLinear(data[p]);
+        const gl = srgbToLinear(data[p + 1]);
+        const bl = srgbToLinear(data[p + 2]);
+        logR[i] = Math.log(rl + 1e-6);
+        logG[i] = Math.log(gl + 1e-6);
+        logB[i] = Math.log(bl + 1e-6);
+        const lum = 0.2126 * rl + 0.7152 * gl + 0.0722 * bl;
+        gray[i] = lum;
+        logL[i] = Math.log(lum + 1e-6);
+      }
+
+      const S_log = boxBlurFloat(logL, canvas.width, canvas.height, RETINEX_BLUR_RADIUS);
+
+      const L = new Float32Array(size);
+      const A = new Float32Array(size);
+      const B = new Float32Array(size);
+      const shade = new Float32Array(size);
+
+      for (let i = 0; i < size; i++) {
+        const rl = Math.exp(logR[i] - S_log[i]);
+        const gl = Math.exp(logG[i] - S_log[i]);
+        const bl = Math.exp(logB[i] - S_log[i]);
+        const lab = linearRgbToLab(rl, gl, bl);
+        L[i] = lab[0];
+        A[i] = lab[1];
+        B[i] = lab[2];
+        shade[i] = Math.exp(S_log[i]);
+      }
+
+      retinexRef.current = { L, A, B, gray, shade };
       
       // Initialize history with original image
       setHistory([{ imageData: initialImageData, timestamp: Date.now() }]);
@@ -299,11 +347,12 @@ export default function ImageCanvas({ imageUrl, selectedColor }: ImageCanvasProp
           ? mask
           : scaleImageData(mask, canvas.width, canvas.height);
       console.log('Scaled mask regions', analyzeMask(scaledMask));
-      applyRetinexRecolor(scaledMask, selectedColor);
+      const indices = maskToIndices(scaledMask);
+      applyRetinexRecolor(indices, selectedColor);
 
       const newWall: WallSurface = {
         id: `wall-${Date.now()}`,
-        pixels: maskToPixelSet(scaledMask),
+        pixels: indices,
         color: selectedColor,
         enabled: true,
         groupId: null
@@ -350,95 +399,46 @@ export default function ImageCanvas({ imageUrl, selectedColor }: ImageCanvasProp
     return tempCtx.getImageData(0, 0, targetWidth, targetHeight);
   };
 
-  const maskToPixelSet = (mask: ImageData): Set<string> => {
-    const pixels = new Set<string>();
+  const maskToIndices = (mask: ImageData): Uint32Array => {
     const { width, height, data } = mask;
+    const pixels: number[] = [];
     for (let y = 0; y < height; y++) {
       for (let x = 0; x < width; x++) {
         const i = (y * width + x) * 4;
         if (data[i] > 0) {
-          pixels.add(`${x},${y}`);
+          pixels.push(y * width + x);
         }
       }
     }
-    return pixels;
+    return new Uint32Array(pixels);
   };
 
-  const wallToMask = (wall: WallSurface): ImageData => {
+  const applyRetinexRecolor = (indices: Uint32Array, colorHex: string) => {
     const canvas = canvasRef.current;
-    if (!canvas) throw new Error('Canvas not available');
-    const mask = new ImageData(canvas.width, canvas.height);
-    const data = mask.data;
-    for (const key of wall.pixels) {
-      const [x, y] = key.split(',').map(Number);
-      const idx = (y * canvas.width + x) * 4;
-      data[idx] = 255;
-      data[idx + 1] = 255;
-      data[idx + 2] = 255;
-      data[idx + 3] = 255;
-    }
-    return mask;
-  };
-
-  const applyRetinexRecolor = (mask: ImageData, colorHex: string) => {
-    const canvas = canvasRef.current;
-    if (!canvas || !originalImageData) return;
+    const pre = retinexRef.current;
+    if (!canvas || !originalImageData || !pre) return;
 
     const width = canvas.width;
-    const height = canvas.height;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    const baseData = ctx.getImageData(0, 0, width, height);
+    const baseData = ctx.getImageData(0, 0, width, canvas.height);
     const data = baseData.data;
-    const orig = originalImageData.data;
-    const maskData = mask.data;
 
-    const size = width * height;
-    const logL = new Float32Array(size);
-    const logR = new Float32Array(size);
-    const logG = new Float32Array(size);
-    const logB = new Float32Array(size);
-    const gray = new Float32Array(size);
+    const { L, A, B, gray, shade } = pre;
 
-    for (let i = 0, p = 0; i < size; i++, p += 4) {
-      const rl = srgbToLinear(orig[p]);
-      const gl = srgbToLinear(orig[p + 1]);
-      const bl = srgbToLinear(orig[p + 2]);
-      logR[i] = Math.log(rl + 1e-6);
-      logG[i] = Math.log(gl + 1e-6);
-      logB[i] = Math.log(bl + 1e-6);
-      const lum = 0.2126 * rl + 0.7152 * gl + 0.0722 * bl;
-      gray[i] = lum;
-      logL[i] = Math.log(lum + 1e-6);
-    }
-
-    const S_log = boxBlurFloat(logL, width, height, RETINEX_BLUR_RADIUS);
-
-    const Larr = new Float32Array(size);
-    const Aarr = new Float32Array(size);
-    const Barr = new Float32Array(size);
     let sumL = 0;
     let sumA = 0;
     let sumB = 0;
     let sumGray = 0;
-    let count = 0;
+    const count = indices.length;
 
-    for (let i = 0, p = 0; i < size; i++, p += 4) {
-      if (maskData[p] > 0) {
-        const rl = Math.exp(logR[i] - S_log[i]);
-        const gl = Math.exp(logG[i] - S_log[i]);
-        const bl = Math.exp(logB[i] - S_log[i]);
-        const [L, a, b] = linearRgbToLab(rl, gl, bl);
-        Larr[i] = L;
-        Aarr[i] = a;
-        Barr[i] = b;
-        sumL += L;
-        sumA += a;
-        sumB += b;
-        sumGray += gray[i];
-        count++;
-      }
+    for (let k = 0; k < indices.length; k++) {
+      const i = indices[k];
+      sumL += L[i];
+      sumA += A[i];
+      sumB += B[i];
+      sumGray += gray[i];
     }
 
     if (count === 0) return;
@@ -449,50 +449,29 @@ export default function ImageCanvas({ imageUrl, selectedColor }: ImageCanvasProp
 
     const [Lt, at, bt] = hexToLab(colorHex);
 
-    // Scale lightness so that the wall's average reflectance matches
-    // the target paint. Without this adjustment, very dark colors like
-    // black appear washed out because the original wall was brighter.
-
-    for (let i = 0, p = 0; i < size; i++, p += 4) {
-      if (maskData[p] > 0) {
-        const chromaScale = Math.min(Math.max(gray[i] / meanGray, 0.4), 1.0);
-        const a = at + (Aarr[i] - meanA) * chromaScale;
-        const b = bt + (Barr[i] - meanB) * chromaScale;
-        // Avoid extreme scaling when the estimated mean lightness is
-        // very small which previously produced near-white results.
-        const rawScale = meanL > 0 ? Lt / meanL : 1;
-        const lightnessScale = Math.min(rawScale, 5);
-        const L = Math.min(Math.max(Larr[i] * lightnessScale, 0), 100);
-        const [rLin, gLin, bLin] = labToLinearRgb(L, a, b);
-        const shade = Math.exp(S_log[i]);
-        const r = linearToSrgb(rLin * shade);
-        const g = linearToSrgb(gLin * shade);
-        const bb = linearToSrgb(bLin * shade);
-        data[p] = r;
-        data[p + 1] = g;
-        data[p + 2] = bb;
-      }
+    for (let k = 0; k < indices.length; k++) {
+      const i = indices[k];
+      const p = i * 4;
+      const chromaScale = Math.min(Math.max(gray[i] / meanGray, 0.4), 1.0);
+      const a = at + (A[i] - meanA) * chromaScale;
+      const b = bt + (B[i] - meanB) * chromaScale;
+      const rawScale = meanL > 0 ? Lt / meanL : 1;
+      const lightnessScale = Math.min(rawScale, 5);
+      const Lval = Math.min(Math.max(L[i] * lightnessScale, 0), 100);
+      const [rLin, gLin, bLin] = labToLinearRgb(Lval, a, b);
+      const r = linearToSrgb(rLin * shade[i]);
+      const g = linearToSrgb(gLin * shade[i]);
+      const bb = linearToSrgb(bLin * shade[i]);
+      data[p] = r;
+      data[p + 1] = g;
+      data[p + 2] = bb;
     }
 
     ctx.putImageData(baseData, 0, 0);
   };
 
   const recolorWall = (wall: WallSurface, newColor: string) => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const mask = new ImageData(canvas.width, canvas.height);
-    const maskData = mask.data;
-    for (const pixelKey of wall.pixels) {
-      const [x, y] = pixelKey.split(',').map(Number);
-      const i = (y * canvas.width + x) * 4;
-      maskData[i] = 255;
-      maskData[i + 1] = 255;
-      maskData[i + 2] = 255;
-      maskData[i + 3] = 255;
-    }
-
-    applyRetinexRecolor(mask, newColor);
+    applyRetinexRecolor(wall.pixels, newColor);
     wall.color = newColor;
     setWalls(walls.map(w => w.id === wall.id ? wall : w));
     saveToHistory();
@@ -508,9 +487,7 @@ export default function ImageCanvas({ imageUrl, selectedColor }: ImageCanvasProp
     ctx.putImageData(originalImageData, 0, 0);
     for (const wall of wallList) {
       if (!wall.enabled) continue;
-      const mask = wallToMask(wall);
-      const color = wall.color;
-      applyRetinexRecolor(mask, color);
+      applyRetinexRecolor(wall.pixels, wall.color);
     }
   };
 
