@@ -585,12 +585,18 @@ export default function ImageCanvas({ imageUrl, selectedColor }: ImageCanvasProp
   };
 
   const assignWallToGroup = (wallId: string, groupId: string | null) => {
-    const updated = walls.map(w =>
-      w.id === wallId ? { ...w, groupId, color: groupId ? (groups.find(g => g.id === groupId)?.color || w.color) : w.color } : w
-    );
-    setWalls(updated);
-    reapplyWalls(updated);
-    saveToHistory();
+    const wall = walls.find(w => w.id === wallId);
+    if (!wall) return;
+
+    const newColor = groupId ? (groups.find(g => g.id === groupId)?.color || wall.color) : wall.color;
+    const updatedWall = { ...wall, groupId, color: newColor };
+
+    if (newColor !== wall.color) {
+      recolorWall(updatedWall, newColor);
+    } else {
+      setWalls(walls.map(w => w.id === wallId ? updatedWall : w));
+      saveToHistory();
+    }
   };
 
   const previewGroupColor = (groupId: string, color: string) => {
