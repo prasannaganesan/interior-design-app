@@ -9,7 +9,7 @@ export const LIGHTING_PRESETS = {
   morning: 'Morning Sun',
   afternoon: 'Afternoon Sun',
   evening: 'Evening',
-  night: 'Night Lights',
+  night: 'Night Lights (LED)',
   cloudy: 'Cloudy Day'
 };
 
