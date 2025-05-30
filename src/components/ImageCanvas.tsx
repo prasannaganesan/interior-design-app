@@ -233,14 +233,14 @@ export default function ImageCanvas({ imageUrl, selectedColor, whiteBalance, lig
   }, [rawImageData, whiteBalance, sam]);
 
   useEffect(() => {
-    // Update wall color when selected color changes and a wall is selected
+    // Update wall color when selected color changes and a wall without a group is selected
     if (selectedWall && selectedColor) {
       const wall = walls.find(w => w.id === selectedWall);
-      if (wall) {
+      if (wall && !wall.groupId) {
         recolorWall(wall, selectedColor);
       }
     }
-  }, [selectedColor, selectedWall]);
+  }, [selectedColor, selectedWall, walls]);
 
 
   const hoverTimer = useRef<number | null>(null);
@@ -645,7 +645,9 @@ export default function ImageCanvas({ imageUrl, selectedColor, whiteBalance, lig
     const name = prompt('Group name?');
     if (!name) return;
     const id = `group-${Date.now()}`;
-    const group: WallGroup = { id, name, color: selectedColor };
+    const wallColor = selectedWall ? walls.find(w => w.id === selectedWall)?.color : null;
+    const groupColor = wallColor || selectedColor;
+    const group: WallGroup = { id, name, color: groupColor };
     setGroups([...groups, group]);
   };
 
@@ -661,6 +663,11 @@ export default function ImageCanvas({ imageUrl, selectedColor, whiteBalance, lig
     } else {
       setWalls(walls.map(w => w.id === wallId ? updatedWall : w));
       saveToHistory();
+    }
+
+    // Prevent future color changes from affecting this wall unintentionally
+    if (selectedWall === wallId) {
+      setSelectedWall(null);
     }
   };
 
@@ -718,7 +725,10 @@ export default function ImageCanvas({ imageUrl, selectedColor, whiteBalance, lig
         <button onClick={redo} disabled={currentHistoryIndex >= history.length - 1 || isProcessing}>Redo</button>
         <button onClick={reset} disabled={isProcessing}>Reset</button>
         {selectedWall && (
-          <button onClick={() => setSelectedWall(null)}>Deselect Wall</button>
+          <span className="selected-wall">
+            Selected: {selectedWall}{' '}
+            <button onClick={() => setSelectedWall(null)}>Clear Selection</button>
+          </span>
         )}
         <span className="status">{status}</span>
       </div>
@@ -747,6 +757,19 @@ export default function ImageCanvas({ imageUrl, selectedColor, whiteBalance, lig
               onChange={c => previewGroupColor(g.id, c)}
               onChangeComplete={c => commitGroupColor(g.id, c)}
             />
+            <select onChange={e => { const wid = e.target.value; if (wid) { assignWallToGroup(wid, g.id); e.target.value=''; } }}>
+              <option value="">Add surface</option>
+              {walls.filter(w => w.groupId !== g.id).map(w => (
+                <option key={w.id} value={w.id}>{w.id}</option>
+              ))}
+            </select>
+            <ul>
+              {walls.filter(w => w.groupId === g.id).map(w => (
+                <li key={w.id}>
+                  {w.id} <button onClick={() => assignWallToGroup(w.id, null)}>Remove</button>
+                </li>
+              ))}
+            </ul>
           </div>
         ))}
       </div>
