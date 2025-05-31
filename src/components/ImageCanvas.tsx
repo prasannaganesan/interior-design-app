@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import ColorPicker from './ColorPicker';
+import { UndoIcon, RedoIcon, ResetIcon, TrashIcon, PlusIcon } from './Icons';
 import { SAM2 } from '../lib/sam';
 import { AVAILABLE_MODELS, getModelFiles } from '../lib/sam/model-loader';
 import {
@@ -663,13 +664,27 @@ export default function ImageCanvas({ imageUrl, selectedColor, whiteBalance, lig
 
   return (
     <div className="canvas-wrapper">
-      <div className="canvas-controls">
-        <button onClick={undo} disabled={currentHistoryIndex <= 0 || isProcessing}>Undo</button>
-        <button onClick={redo} disabled={currentHistoryIndex >= history.length - 1 || isProcessing}>Redo</button>
-        <button onClick={reset} disabled={isProcessing}>Reset</button>
-      </div>
       <div className="canvas-content">
         <div className="canvas-area">
+          <div className="canvas-controls">
+            <button
+              title="Undo"
+              onClick={undo}
+              disabled={currentHistoryIndex <= 0 || isProcessing}
+            >
+              <UndoIcon />
+            </button>
+            <button
+              title="Redo"
+              onClick={redo}
+              disabled={currentHistoryIndex >= history.length - 1 || isProcessing}
+            >
+              <RedoIcon />
+            </button>
+            <button title="Reset" onClick={reset} disabled={isProcessing}>
+              <ResetIcon />
+            </button>
+          </div>
           <canvas
             ref={canvasRef}
             onMouseDown={handleMouseDown}
@@ -690,7 +705,10 @@ export default function ImageCanvas({ imageUrl, selectedColor, whiteBalance, lig
           )}
         </div>
         <div className="sidebar">
-          <button className="add-group" onClick={addGroup}>Add Group</button>
+          <button className="add-group" onClick={addGroup}>
+            <PlusIcon />
+            <span>Add Group</span>
+          </button>
           {groups.map(g => (
             <div key={g.id} className="group-section">
               <div className="group-header">
@@ -707,7 +725,13 @@ export default function ImageCanvas({ imageUrl, selectedColor, whiteBalance, lig
                     <label>
                       <input type="checkbox" checked={w.enabled} onChange={() => toggleWall(w.id)} /> {w.id}
                     </label>
-                    <button onClick={() => assignWallToGroup(w.id, null)}>Remove</button>
+                    <button
+                      className="remove-btn"
+                      title="Remove surface from group"
+                      onClick={() => assignWallToGroup(w.id, null)}
+                    >
+                      <TrashIcon />
+                    </button>
                   </li>
                 ))}
                 <li>
