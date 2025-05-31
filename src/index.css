@@ -6,7 +6,8 @@
   font-weight: 400;
 
   /* Light mode as the default look */
-  --accent-color: #0a84ff;
+  --accent-color: #9d7cd8;
+  --accent-hover: #875dc4;
   /* Spacing scale */
   --spacing-xs: 4px;
   --spacing-sm: 8px;
@@ -15,7 +16,7 @@
   --spacing-xl: 32px;
   color-scheme: light;
   color: #1c1c1e;
-  background-color: #f5f5f7;
+  background-color: #f6f1fb;
 
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -29,7 +30,7 @@ a {
   text-decoration: inherit;
 }
 a:hover {
-  color: #006be6;
+  color: var(--accent-hover);
 }
 
 body {
@@ -59,7 +60,7 @@ button {
   transition: background-color 0.25s;
 }
 button:hover {
-  background-color: #006be6;
+  background-color: var(--accent-hover);
 }
 button:focus,
 button:focus-visible {

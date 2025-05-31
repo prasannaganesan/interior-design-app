@@ -254,7 +254,7 @@ h2 {
 }
 
 .hsv-slider input[type="range"]::-webkit-slider-thumb:hover {
-  background: #006be6;
+  background: var(--accent-hover);
 }
 
 .hsv-slider:nth-child(1) input[type="range"] {
@@ -299,24 +299,35 @@ h2 {
 }
 
 .canvas-controls {
+  position: absolute;
+  top: 8px;
+  left: 8px;
   display: flex;
-  gap: 0.5rem;
-  justify-content: center;
+  gap: 4px;
+  background: rgba(255, 255, 255, 0.8);
+  padding: 4px;
+  border-radius: 6px;
+  z-index: 10;
 }
 
 .canvas-controls button {
-  padding: 0.5rem 1rem;
+  width: 32px;
+  height: 32px;
+  padding: 0;
   border: none;
-  border-radius: 6px;
+  border-radius: 4px;
   background-color: var(--accent-color);
   color: white;
   cursor: pointer;
   font-weight: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   transition: background-color 0.2s;
 }
 
 .canvas-controls button:hover {
-  background-color: #006be6;
+  background-color: var(--accent-hover);
 }
 
 .canvas-controls button:disabled {
@@ -473,6 +484,14 @@ h2 {
   border: none;
   border-radius: 6px;
   cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.add-group svg {
+  width: 16px;
+  height: 16px;
 }
 
 .group-section {
@@ -500,6 +519,20 @@ h2 {
   align-items: center;
   gap: 6px;
   margin-bottom: 4px;
+}
+
+.remove-btn {
+  background: none;
+  border: none;
+  color: var(--accent-color);
+  cursor: pointer;
+  padding: 2px;
+  display: flex;
+  align-items: center;
+}
+
+.remove-btn:hover {
+  color: var(--accent-hover);
 }
 
 .canvas-area {
