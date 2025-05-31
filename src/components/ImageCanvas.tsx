@@ -684,72 +684,74 @@ export default function ImageCanvas({ imageUrl, selectedColor, whiteBalance, lig
           </span>
         )}
       </div>
-      <div className="sidebar">
-        <button className="add-group" onClick={addGroup}>Add Group</button>
-        {groups.map(g => (
-          <div key={g.id} className="group-section">
-            <div className="group-header">
-              <span>{g.name}</span>
-              <ColorPicker
-                value={g.color}
-                onChange={c => previewGroupColor(g.id, c)}
-                onChangeComplete={c => commitGroupColor(g.id, c)}
-              />
+      <div className="canvas-content">
+        <div className="canvas-area">
+          <canvas
+            ref={canvasRef}
+            onMouseDown={handleMouseDown}
+            onMouseMove={handleMouseMove}
+            onMouseLeave={clearHover}
+            style={{
+              maxWidth: '100%',
+              height: 'auto',
+              cursor: isProcessing ? 'wait' : 'pointer',
+              border: '1px solid #ccc'
+            }}
+          />
+          {isProcessing && (
+            <div className="processing-overlay">
+              <div className="spinner" />
+              <span>{status}</span>
             </div>
-            <ul className="group-surfaces">
-              {walls.filter(w => w.groupId === g.id).map(w => (
-                <li key={w.id}>
-                  <label>
-                    <input type="checkbox" checked={w.enabled} onChange={() => toggleWall(w.id)} /> {w.id}
-                  </label>
-                  <button onClick={() => assignWallToGroup(w.id, null)}>Remove</button>
+          )}
+        </div>
+        <div className="sidebar">
+          <button className="add-group" onClick={addGroup}>Add Group</button>
+          {groups.map(g => (
+            <div key={g.id} className="group-section">
+              <div className="group-header">
+                <span>{g.name}</span>
+                <ColorPicker
+                  value={g.color}
+                  onChange={c => previewGroupColor(g.id, c)}
+                  onChangeComplete={c => commitGroupColor(g.id, c)}
+                />
+              </div>
+              <ul className="group-surfaces">
+                {walls.filter(w => w.groupId === g.id).map(w => (
+                  <li key={w.id}>
+                    <label>
+                      <input type="checkbox" checked={w.enabled} onChange={() => toggleWall(w.id)} /> {w.id}
+                    </label>
+                    <button onClick={() => assignWallToGroup(w.id, null)}>Remove</button>
+                  </li>
+                ))}
+                <li>
+                  <select onChange={e => { const wid = e.target.value; if (wid) { assignWallToGroup(wid, g.id); e.target.value=''; } }}>
+                    <option value="">Add surface...</option>
+                    {walls.filter(w => w.groupId !== g.id).map(w => (
+                      <option key={w.id} value={w.id}>{w.id}</option>
+                    ))}
+                  </select>
                 </li>
-              ))}
-              <li>
-                <select onChange={e => { const wid = e.target.value; if (wid) { assignWallToGroup(wid, g.id); e.target.value=''; } }}>
-                  <option value="">Add surface...</option>
-                  {walls.filter(w => w.groupId !== g.id).map(w => (
-                    <option key={w.id} value={w.id}>{w.id}</option>
-                  ))}
-                </select>
-              </li>
-            </ul>
-          </div>
-        ))}
-        {walls.filter(w => !w.groupId).length > 0 && (
-          <div className="group-section">
-            <div className="group-header"><span>Other</span></div>
-            <ul className="group-surfaces">
-              {walls.filter(w => !w.groupId).map(w => (
-                <li key={w.id}>
-                  <label>
-                    <input type="checkbox" checked={w.enabled} onChange={() => toggleWall(w.id)} /> {w.id}
-                  </label>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-      </div>
-      <div className="canvas-area">
-        <canvas
-          ref={canvasRef}
-          onMouseDown={handleMouseDown}
-          onMouseMove={handleMouseMove}
-          onMouseLeave={clearHover}
-          style={{
-            maxWidth: '100%',
-            height: 'auto',
-            cursor: isProcessing ? 'wait' : 'pointer',
-            border: '1px solid #ccc'
-          }}
-        />
-        {isProcessing && (
-          <div className="processing-overlay">
-            <div className="spinner" />
-            <span>{status}</span>
-          </div>
-        )}
+              </ul>
+            </div>
+          ))}
+          {walls.filter(w => !w.groupId).length > 0 && (
+            <div className="group-section">
+              <div className="group-header"><span>Other</span></div>
+              <ul className="group-surfaces">
+                {walls.filter(w => !w.groupId).map(w => (
+                  <li key={w.id}>
+                    <label>
+                      <input type="checkbox" checked={w.enabled} onChange={() => toggleWall(w.id)} /> {w.id}
+                    </label>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
