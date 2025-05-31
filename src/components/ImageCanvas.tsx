@@ -168,9 +168,13 @@ export default function ImageCanvas({ imageUrl, selectedColor, whiteBalance, lig
       const ctx = canvas.getContext('2d', { willReadFrequently: true });
       if (!ctx) return;
 
-      const balancedData = applyWhiteBalance(rawImageData, whiteBalance);
-      setOriginalImageData(balancedData);
-      ctx.putImageData(balancedData, 0, 0);
+      setIsProcessing(true);
+      setStatus('Processing image...');
+
+      try {
+        const balancedData = applyWhiteBalance(rawImageData, whiteBalance);
+        setOriginalImageData(balancedData);
+        ctx.putImageData(balancedData, 0, 0);
 
       const { data } = balancedData;
       const size = canvas.width * canvas.height;
@@ -223,19 +227,23 @@ export default function ImageCanvas({ imageUrl, selectedColor, whiteBalance, lig
       if (sam) {
         try {
           setStatus('Generating image embeddings...');
-          setIsProcessing(true);
           await sam.generateEmbedding(balancedData);
-          setStatus('Ready');
         } catch (error) {
           console.error('Failed to generate embeddings:', error);
           setStatus('Failed to generate embeddings');
-        } finally {
-          setIsProcessing(false);
         }
       }
+
+      setStatus('Ready');
+    } catch (error) {
+      console.error('Failed to process image:', error);
+      setStatus('Failed to process image');
+    } finally {
+      setIsProcessing(false);
     }
-    process();
-  }, [rawImageData, whiteBalance, sam]);
+  }
+  process();
+}, [rawImageData, whiteBalance, sam]);
 
   useEffect(() => {
     // Update wall color when selected color changes and a wall without a group is selected
