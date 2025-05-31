@@ -31,11 +31,11 @@ export class SAM2 {
 
   async initialize() {
     try {
-      console.log('Starting SAM2 initialization...');
+      console.debug('Starting SAM2 initialization...');
 
       // Configure ONNX Runtime environment before creating any sessions
       if (!SAM2.isInitialized) {
-        console.log('Configuring ONNX Runtime environment...');
+        console.debug('Configuring ONNX Runtime environment...');
         
         // Enable optimization features
         ort.env.wasm.simd = true;
@@ -48,7 +48,7 @@ export class SAM2 {
         };
 
         SAM2.isInitialized = true;
-        console.log('ONNX Runtime environment configured');
+        console.debug('ONNX Runtime environment configured');
       }
 
       // Configure session options
@@ -58,22 +58,22 @@ export class SAM2 {
       };
 
       // Initialize encoder
-      console.log('Loading encoder from:', this.modelConfig.encoderPath);
+      console.debug('Loading encoder from:', this.modelConfig.encoderPath);
       this.encoderSession = await ort.InferenceSession.create(
         this.modelConfig.encoderPath,
         options
       );
-      console.log('Encoder loaded successfully');
+      console.debug('Encoder loaded successfully');
       
       // Initialize decoder
-      console.log('Loading decoder from:', this.modelConfig.decoderPath);
+      console.debug('Loading decoder from:', this.modelConfig.decoderPath);
       this.decoderSession = await ort.InferenceSession.create(
         this.modelConfig.decoderPath,
         options
       );
-      console.log('Decoder loaded successfully');
+      console.debug('Decoder loaded successfully');
       
-      console.log('Successfully initialized SAM2');
+      console.debug('Successfully initialized SAM2');
     } catch (error) {
       console.error('Failed to initialize:', error);
       throw error;
@@ -86,7 +86,7 @@ export class SAM2 {
     }
 
     try {
-      console.log('Preprocessing image...');
+      console.debug('Preprocessing image...');
       const { tensor, scale, offsetX, offsetY } = await this.preprocessImage(imageData);
 
       // Store original size and preprocessing params
@@ -96,7 +96,7 @@ export class SAM2 {
       this.offsetX = offsetX;
       this.offsetY = offsetY;
       
-      console.log('Running encoder...');
+      console.debug('Running encoder...');
       const feeds = { image: tensor };
       const results = await this.encoderSession.run(feeds);
 
@@ -109,7 +109,7 @@ export class SAM2 {
         high_res_feats_1: results[this.encoderSession.outputNames[1]],
         image_embed: results[this.encoderSession.outputNames[2]]
       };
-      console.log('Successfully generated embeddings');
+      console.debug('Successfully generated embeddings');
     } catch (error) {
       console.error('Error in generateEmbedding:', error);
       throw new Error(`Failed to generate embeddings: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -125,7 +125,7 @@ export class SAM2 {
     }
 
     try {
-      console.log('Preparing inputs for mask generation...');
+      console.debug('Preparing inputs for mask generation...');
       // Prepare point input
       // Convert point to preprocessing coordinates
       const scaledX = point.x * this.scale + this.offsetX;
@@ -150,7 +150,7 @@ export class SAM2 {
         [2]
       );
 
-      console.log('Running decoder...');
+      console.debug('Running decoder...');
       const feeds = {
         image_embed: this.imageEmbedding.image_embed,
         high_res_feats_0: this.imageEmbedding.high_res_feats_0,
@@ -168,7 +168,7 @@ export class SAM2 {
         throw new Error('Decoder failed to produce valid output');
       }
 
-      console.log('Processing decoder output...');
+      console.debug('Processing decoder output...');
       const masks = result.masks;
       const scores = result.iou_predictions.data;
       const bestMaskIdx = scores.indexOf(Math.max(...scores));

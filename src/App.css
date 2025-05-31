@@ -84,6 +84,25 @@ h2 {
   border: 1px solid #ddd;
   border-radius: 4px;
   background-color: white;
+  cursor: pointer;
+}
+
+.file-input::-webkit-file-upload-button {
+  padding: 0.4rem 1rem;
+  border: none;
+  background: #4a90e2;
+  color: white;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.file-input::file-selector-button {
+  padding: 0.4rem 1rem;
+  border: none;
+  background: #4a90e2;
+  color: white;
+  border-radius: 4px;
+  cursor: pointer;
 }
 
 .color-picker-container {
@@ -418,15 +437,80 @@ h2 {
   transform: translateY(-4px);
 }
 
-.wall-list, .group-list {
+.sidebar {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  margin: 8px 0;
+  gap: 12px;
+  margin-top: 1rem;
 }
 
-.wall-item, .group-item {
+.add-group {
+  align-self: flex-start;
+  padding: 0.25rem 0.75rem;
+  background: #4a90e2;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.group-section {
+  background: #fff;
+  border-radius: 6px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  padding: 0.5rem 0.75rem;
+}
+
+.group-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.25rem;
+}
+
+.group-surfaces {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.group-surfaces li {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
+  margin-bottom: 4px;
 }
+
+.canvas-area {
+  position: relative;
+  display: flex;
+  justify-content: center;
+}
+
+.processing-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(255,255,255,0.7);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.9rem;
+  color: #333;
+}
+
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid #ccc;
+  border-top-color: #4a90e2;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: 0.5rem;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
