@@ -355,6 +355,7 @@ export default function ImageCanvas({ imageUrl, selectedColor, whiteBalance, lig
           ? mask
           : scaleImageData(mask, canvas.width, canvas.height);
       const indices = maskToIndices(scaledMask);
+      let historyImage: ImageData | undefined;
       if (baseImageData) {
         const updated = new ImageData(
           new Uint8ClampedArray(baseImageData.data),
@@ -365,6 +366,7 @@ export default function ImageCanvas({ imageUrl, selectedColor, whiteBalance, lig
         setBaseImageData(updated);
         ctx.putImageData(updated, 0, 0);
         applyLighting(ctx, canvas.width, canvas.height, lighting);
+        historyImage = updated;
       }
 
       const newWall: WallSurface = {
@@ -377,7 +379,7 @@ export default function ImageCanvas({ imageUrl, selectedColor, whiteBalance, lig
       setWalls([...walls, newWall]);
 
       // Save to history
-      saveToHistory();
+      saveToHistory(historyImage);
       setStatus('Ready');
     } catch (error) {
       console.error('Failed to generate/apply mask:', error);
@@ -489,7 +491,7 @@ export default function ImageCanvas({ imageUrl, selectedColor, whiteBalance, lig
     applyRetinexRecolor(updated, wall.pixels, newColor);
     setBaseImageData(updated);
     wall.color = newColor;
-    setWalls(walls.map(w => w.id === wall.id ? wall : w));
+    setWalls(walls.map(w => (w.id === wall.id ? wall : w)));
     const canvas = canvasRef.current;
     if (canvas) {
       const ctx = canvas.getContext('2d');
@@ -498,15 +500,15 @@ export default function ImageCanvas({ imageUrl, selectedColor, whiteBalance, lig
         applyLighting(ctx, canvas.width, canvas.height, lighting);
       }
     }
-    saveToHistory();
+    saveToHistory(updated);
   };
 
-  const reapplyWalls = (wallList: WallSurface[] = walls) => {
+  const reapplyWalls = (wallList: WallSurface[] = walls): ImageData | null => {
     const canvas = canvasRef.current;
-    if (!canvas || !originalImageData) return;
+    if (!canvas || !originalImageData) return null;
 
     const ctx = canvas.getContext('2d');
-    if (!ctx) return;
+    if (!ctx) return null;
 
     const base = new ImageData(
       new Uint8ClampedArray(originalImageData.data),
@@ -520,17 +522,19 @@ export default function ImageCanvas({ imageUrl, selectedColor, whiteBalance, lig
     setBaseImageData(base);
     ctx.putImageData(base, 0, 0);
     applyLighting(ctx, canvas.width, canvas.height, lighting);
+    return base;
   };
 
-  const saveToHistory = () => {
+  const saveToHistory = (img?: ImageData) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    const currentImageData = baseImageData
-      ? new ImageData(new Uint8ClampedArray(baseImageData.data), baseImageData.width, baseImageData.height)
+    const source = img ?? baseImageData;
+    const currentImageData = source
+      ? new ImageData(new Uint8ClampedArray(source.data), source.width, source.height)
       : ctx.getImageData(0, 0, canvas.width, canvas.height);
     
     // Remove any redo states
@@ -588,8 +592,8 @@ export default function ImageCanvas({ imageUrl, selectedColor, whiteBalance, lig
       w.id === id ? { ...w, enabled: !w.enabled } : w
     );
     setWalls(updated);
-    reapplyWalls(updated);
-    saveToHistory();
+    const base = reapplyWalls(updated);
+    saveToHistory(base ?? undefined);
   };
 
   const addGroup = () => {
@@ -627,8 +631,8 @@ export default function ImageCanvas({ imageUrl, selectedColor, whiteBalance, lig
       w.groupId === groupId ? { ...w, color } : w
     );
     setWalls(updated);
-    reapplyWalls(updated);
-    saveToHistory();
+    const base = reapplyWalls(updated);
+    saveToHistory(base ?? undefined);
   };
 
   const reset = () => {
