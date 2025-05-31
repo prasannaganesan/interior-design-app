@@ -288,6 +288,7 @@ export default function ImageCanvas({ imageUrl, selectedColor, whiteBalance, lig
     if (!base) return;
 
     ctx.putImageData(base, 0, 0);
+    applyLighting(ctx, canvas.width, canvas.height, lighting);
     const scaledMask =
       mask.width === canvas.width && mask.height === canvas.height
         ? mask
@@ -315,7 +316,10 @@ export default function ImageCanvas({ imageUrl, selectedColor, whiteBalance, lig
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
     const base = history[currentHistoryIndex]?.imageData;
-    if (base) ctx.putImageData(base, 0, 0);
+    if (base) {
+      ctx.putImageData(base, 0, 0);
+      applyLighting(ctx, canvas.width, canvas.height, lighting);
+    }
     if (hoverTimer.current) {
       clearTimeout(hoverTimer.current);
       hoverTimer.current = null;
