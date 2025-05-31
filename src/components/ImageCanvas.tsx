@@ -246,58 +246,6 @@ export default function ImageCanvas({ imageUrl, selectedColor, whiteBalance, lig
 
   const hoverTimer = useRef<number | null>(null);
 
-  // Analyze connected regions in a mask for debugging purposes
-  const analyzeMask = (mask: ImageData) => {
-    const { width, height, data } = mask;
-    const visited = new Uint8Array(width * height);
-    const regions: { xMin: number; yMin: number; xMax: number; yMax: number; size: number }[] = [];
-    const queue: [number, number][] = [];
-    const idx = (x: number, y: number) => (y * width + x) * 4;
-
-    for (let y = 0; y < height; y++) {
-      for (let x = 0; x < width; x++) {
-        const flat = y * width + x;
-        if (data[idx(x, y)] > 0 && !visited[flat]) {
-          let xMin = x;
-          let xMax = x;
-          let yMin = y;
-          let yMax = y;
-          let size = 0;
-          queue.push([x, y]);
-          visited[flat] = 1;
-
-          while (queue.length) {
-            const [qx, qy] = queue.pop()!;
-            size++;
-            xMin = Math.min(xMin, qx);
-            xMax = Math.max(xMax, qx);
-            yMin = Math.min(yMin, qy);
-            yMax = Math.max(yMax, qy);
-
-            const neighbors = [
-              [qx - 1, qy],
-              [qx + 1, qy],
-              [qx, qy - 1],
-              [qx, qy + 1]
-            ];
-            for (const [nx, ny] of neighbors) {
-              if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
-                const nFlat = ny * width + nx;
-                if (!visited[nFlat] && data[idx(nx, ny)] > 0) {
-                  visited[nFlat] = 1;
-                  queue.push([nx, ny]);
-                }
-              }
-            }
-          }
-
-          regions.push({ xMin, yMin, xMax, yMax, size });
-        }
-      }
-    }
-
-    return regions;
-  };
 
   const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
@@ -341,7 +289,6 @@ export default function ImageCanvas({ imageUrl, selectedColor, whiteBalance, lig
         ? mask
         : scaleImageData(mask, canvas.width, canvas.height);
 
-    console.log('Hover mask regions', analyzeMask(scaledMask));
     const overlay = ctx.getImageData(0, 0, canvas.width, canvas.height);
     const data = overlay.data;
     const maskData = scaledMask.data;
@@ -395,14 +342,12 @@ export default function ImageCanvas({ imageUrl, selectedColor, whiteBalance, lig
 
       // Generate mask for clicked point
       const mask = await sam.generateMask({ x: clampedX, y: clampedY });
-      console.log('Raw mask regions', analyzeMask(mask));
 
       // Scale mask to canvas size if needed
       const scaledMask =
         mask.width === canvas.width && mask.height === canvas.height
           ? mask
           : scaleImageData(mask, canvas.width, canvas.height);
-      console.log('Scaled mask regions', analyzeMask(scaledMask));
       const indices = maskToIndices(scaledMask);
       if (baseImageData) {
         const updated = new ImageData(
@@ -731,61 +676,74 @@ export default function ImageCanvas({ imageUrl, selectedColor, whiteBalance, lig
             <button onClick={() => setSelectedWall(null)}>Clear Selection</button>
           </span>
         )}
-        <span className="status">{status}</span>
       </div>
-      <div className="wall-list">
-        {walls.map(w => (
-          <div key={w.id} className="wall-item">
-            <label>
-              <input type="checkbox" checked={w.enabled} onChange={() => toggleWall(w.id)} /> {w.id}
-            </label>
-            <select value={w.groupId || ''} onChange={e => assignWallToGroup(w.id, e.target.value || null)}>
-              <option value="">No group</option>
-              {groups.map(g => (
-                <option key={g.id} value={g.id}>{g.name}</option>
-              ))}
-            </select>
-          </div>
-        ))}
-      </div>
-      <div className="group-list">
-        <button onClick={addGroup}>Add Group</button>
+      <div className="sidebar">
+        <button className="add-group" onClick={addGroup}>Add Group</button>
         {groups.map(g => (
-          <div key={g.id} className="group-item">
-            <span>{g.name}</span>
-            <ColorPicker
-              value={g.color}
-              onChange={c => previewGroupColor(g.id, c)}
-              onChangeComplete={c => commitGroupColor(g.id, c)}
-            />
-            <select onChange={e => { const wid = e.target.value; if (wid) { assignWallToGroup(wid, g.id); e.target.value=''; } }}>
-              <option value="">Add surface</option>
-              {walls.filter(w => w.groupId !== g.id).map(w => (
-                <option key={w.id} value={w.id}>{w.id}</option>
-              ))}
-            </select>
-            <ul>
+          <div key={g.id} className="group-section">
+            <div className="group-header">
+              <span>{g.name}</span>
+              <ColorPicker
+                value={g.color}
+                onChange={c => previewGroupColor(g.id, c)}
+                onChangeComplete={c => commitGroupColor(g.id, c)}
+              />
+            </div>
+            <ul className="group-surfaces">
               {walls.filter(w => w.groupId === g.id).map(w => (
                 <li key={w.id}>
-                  {w.id} <button onClick={() => assignWallToGroup(w.id, null)}>Remove</button>
+                  <label>
+                    <input type="checkbox" checked={w.enabled} onChange={() => toggleWall(w.id)} /> {w.id}
+                  </label>
+                  <button onClick={() => assignWallToGroup(w.id, null)}>Remove</button>
+                </li>
+              ))}
+              <li>
+                <select onChange={e => { const wid = e.target.value; if (wid) { assignWallToGroup(wid, g.id); e.target.value=''; } }}>
+                  <option value="">Add surface...</option>
+                  {walls.filter(w => w.groupId !== g.id).map(w => (
+                    <option key={w.id} value={w.id}>{w.id}</option>
+                  ))}
+                </select>
+              </li>
+            </ul>
+          </div>
+        ))}
+        {walls.filter(w => !w.groupId).length > 0 && (
+          <div className="group-section">
+            <div className="group-header"><span>Other</span></div>
+            <ul className="group-surfaces">
+              {walls.filter(w => !w.groupId).map(w => (
+                <li key={w.id}>
+                  <label>
+                    <input type="checkbox" checked={w.enabled} onChange={() => toggleWall(w.id)} /> {w.id}
+                  </label>
                 </li>
               ))}
             </ul>
           </div>
-        ))}
+        )}
       </div>
-      <canvas
-        ref={canvasRef}
-        onMouseDown={handleMouseDown}
-        onMouseMove={handleMouseMove}
-        onMouseLeave={clearHover}
-        style={{
-          maxWidth: '100%',
-          height: 'auto',
-          cursor: isProcessing ? 'wait' : 'pointer',
-          border: '1px solid #ccc'
-        }}
-      />
+      <div className="canvas-area">
+        <canvas
+          ref={canvasRef}
+          onMouseDown={handleMouseDown}
+          onMouseMove={handleMouseMove}
+          onMouseLeave={clearHover}
+          style={{
+            maxWidth: '100%',
+            height: 'auto',
+            cursor: isProcessing ? 'wait' : 'pointer',
+            border: '1px solid #ccc'
+          }}
+        />
+        {isProcessing && (
+          <div className="processing-overlay">
+            <div className="spinner" />
+            <span>{status}</span>
+          </div>
+        )}
+      </div>
     </div>
   );
-} 
+}
