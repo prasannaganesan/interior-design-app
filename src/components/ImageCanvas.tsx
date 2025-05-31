@@ -134,7 +134,9 @@ export default function ImageCanvas({ imageUrl, selectedColor, whiteBalance, lig
         console.error('Failed to initialize SAM2:', error);
         setStatus('Failed to initialize SAM2');
       } finally {
-        setIsProcessing(false);
+        // Wait a bit to allow the WASM runtime to finish any remaining work
+        // before removing the processing overlay so the UI remains responsive.
+        setTimeout(() => setIsProcessing(false), 500);
       }
     }
 
@@ -237,7 +239,7 @@ export default function ImageCanvas({ imageUrl, selectedColor, whiteBalance, lig
       console.error('Failed to process image:', error);
       setStatus('Failed to process image');
     } finally {
-      setIsProcessing(false);
+      setTimeout(() => setIsProcessing(false), 100);
     }
   }
   process();
@@ -379,7 +381,7 @@ export default function ImageCanvas({ imageUrl, selectedColor, whiteBalance, lig
       console.error('Failed to generate/apply mask:', error);
       setStatus('Failed to generate mask');
     } finally {
-      setIsProcessing(false);
+      setTimeout(() => setIsProcessing(false), 100);
     }
   };
 
