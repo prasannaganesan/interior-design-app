@@ -19,7 +19,7 @@ h1 {
 
 .main-content {
   display: grid;
-  grid-template-columns: 320px 1fr 320px;
+  grid-template-columns: 320px 1fr;
   gap: var(--spacing-lg);
   min-height: 600px;
   align-items: flex-start;
@@ -34,23 +34,17 @@ h1 {
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
 }
 
-.upload-section,
-.color-picker-section {
+
+.panel-section {
   margin-bottom: 2rem;
 }
 
-.white-balance-section {
-  margin-bottom: 2rem;
-}
 
-.lighting-selector {
-  margin-bottom: 2rem;
-}
-
-.lighting-selector label {
-  display: block;
-  margin-bottom: 0.5rem;
+.lighting-selector h2 {
+  font-size: 1.2rem;
+  margin-bottom: 1rem;
   color: #444;
+  font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
 }
 
 .lighting-selector select {
@@ -64,6 +58,7 @@ h2 {
   font-size: 1.2rem;
   margin-bottom: 1rem;
   color: #444;
+  font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
 }
 
 .file-input {

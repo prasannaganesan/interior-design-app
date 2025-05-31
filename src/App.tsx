@@ -56,7 +56,7 @@ function App() {
       <h1>Interior Design Color Visualizer</h1>
       <div className="main-content">
         <div className="controls-panel">
-          <div className="upload-section">
+          <div className="upload-section panel-section">
             <h2>Upload Image</h2>
             <input
               type="file"
@@ -65,7 +65,7 @@ function App() {
               className="file-input"
             />
           </div>
-          <div className="color-picker-section">
+          <div className="color-picker-section panel-section">
             <h2>Select Wall Color</h2>
             <ColorPicker
               value={selectedColor}
@@ -75,7 +75,7 @@ function App() {
               Click and drag on the walls to apply the selected color
             </p>
           </div>
-          <div className="white-balance-section">
+          <div className="white-balance-section panel-section">
             <h2>White Balance</h2>
             <WhiteBalanceControls
               value={whiteBalance}
@@ -83,7 +83,7 @@ function App() {
               onAuto={() => selectedImage && computeAutoWhiteBalance(selectedImage).then(setWhiteBalance)}
             />
           </div>
-          <LightingSelector value={lighting} onChange={setLighting} />
+          <LightingSelector value={lighting} onChange={setLighting} className="panel-section" />
         </div>
         <div className="canvas-container">
           {selectedImage ? (
