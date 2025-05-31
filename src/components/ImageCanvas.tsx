@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import ColorPicker from './ColorPicker';
+import { UndoIcon, RedoIcon, ResetIcon, TrashIcon, PlusIcon } from './Icons';
 import { SAM2 } from '../lib/sam';
 import { AVAILABLE_MODELS, getModelFiles } from '../lib/sam/model-loader';
 import {
@@ -60,6 +62,7 @@ interface ImageCanvasProps {
   selectedColor: string;
   whiteBalance: WhiteBalance;
   lighting: string;
+  sidebarContainer?: HTMLElement | null;
 }
 
 interface HistoryState {
@@ -83,7 +86,7 @@ interface WallGroup {
 }
 
 
-export default function ImageCanvas({ imageUrl, selectedColor, whiteBalance, lighting }: ImageCanvasProps) {
+export default function ImageCanvas({ imageUrl, selectedColor, whiteBalance, lighting, sidebarContainer }: ImageCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [rawImageData, setRawImageData] = useState<ImageData | null>(null);
   const [originalImageData, setOriginalImageData] = useState<ImageData | null>(null);
@@ -661,15 +664,88 @@ export default function ImageCanvas({ imageUrl, selectedColor, whiteBalance, lig
     applyLighting(ctx, canvas.width, canvas.height, lighting);
   }, [lighting, baseImageData]);
 
+  const groupsSidebar = (
+    <>
+      <button className="add-group" onClick={addGroup}>
+        <PlusIcon />
+        <span>Add Group</span>
+      </button>
+      {groups.map(g => (
+        <div key={g.id} className="group-section">
+          <div className="group-header">
+            <span>{g.name}</span>
+            <ColorPicker
+              value={g.color}
+              onChange={c => previewGroupColor(g.id, c)}
+              onChangeComplete={c => commitGroupColor(g.id, c)}
+            />
+          </div>
+          <ul className="group-surfaces">
+            {walls.filter(w => w.groupId === g.id).map(w => (
+              <li key={w.id}>
+                <label>
+                  <input type="checkbox" checked={w.enabled} onChange={() => toggleWall(w.id)} /> {w.id}
+                </label>
+                <button
+                  className="remove-btn"
+                  title="Remove surface from group"
+                  onClick={() => assignWallToGroup(w.id, null)}
+                >
+                  <TrashIcon />
+                </button>
+              </li>
+            ))}
+            <li>
+              <select onChange={e => { const wid = e.target.value; if (wid) { assignWallToGroup(wid, g.id); e.target.value=''; } }}>
+                <option value="">Add surface...</option>
+                {walls.filter(w => w.groupId !== g.id).map(w => (
+                  <option key={w.id} value={w.id}>{w.id}</option>
+                ))}
+              </select>
+            </li>
+          </ul>
+        </div>
+      ))}
+      {walls.filter(w => !w.groupId).length > 0 && (
+        <div className="group-section">
+          <div className="group-header"><span>Other</span></div>
+          <ul className="group-surfaces">
+            {walls.filter(w => !w.groupId).map(w => (
+              <li key={w.id}>
+                <label>
+                  <input type="checkbox" checked={w.enabled} onChange={() => toggleWall(w.id)} /> {w.id}
+                </label>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </>
+  );
+
   return (
     <div className="canvas-wrapper">
-      <div className="canvas-controls">
-        <button onClick={undo} disabled={currentHistoryIndex <= 0 || isProcessing}>Undo</button>
-        <button onClick={redo} disabled={currentHistoryIndex >= history.length - 1 || isProcessing}>Redo</button>
-        <button onClick={reset} disabled={isProcessing}>Reset</button>
-      </div>
       <div className="canvas-content">
         <div className="canvas-area">
+          <div className="canvas-controls">
+            <button
+              title="Undo"
+              onClick={undo}
+              disabled={currentHistoryIndex <= 0 || isProcessing}
+            >
+              <UndoIcon />
+            </button>
+            <button
+              title="Redo"
+              onClick={redo}
+              disabled={currentHistoryIndex >= history.length - 1 || isProcessing}
+            >
+              <RedoIcon />
+            </button>
+            <button title="Reset" onClick={reset} disabled={isProcessing}>
+              <ResetIcon />
+            </button>
+          </div>
           <canvas
             ref={canvasRef}
             onMouseDown={handleMouseDown}
@@ -689,54 +765,8 @@ export default function ImageCanvas({ imageUrl, selectedColor, whiteBalance, lig
             </div>
           )}
         </div>
-        <div className="sidebar">
-          <button className="add-group" onClick={addGroup}>Add Group</button>
-          {groups.map(g => (
-            <div key={g.id} className="group-section">
-              <div className="group-header">
-                <span>{g.name}</span>
-                <ColorPicker
-                  value={g.color}
-                  onChange={c => previewGroupColor(g.id, c)}
-                  onChangeComplete={c => commitGroupColor(g.id, c)}
-                />
-              </div>
-              <ul className="group-surfaces">
-                {walls.filter(w => w.groupId === g.id).map(w => (
-                  <li key={w.id}>
-                    <label>
-                      <input type="checkbox" checked={w.enabled} onChange={() => toggleWall(w.id)} /> {w.id}
-                    </label>
-                    <button onClick={() => assignWallToGroup(w.id, null)}>Remove</button>
-                  </li>
-                ))}
-                <li>
-                  <select onChange={e => { const wid = e.target.value; if (wid) { assignWallToGroup(wid, g.id); e.target.value=''; } }}>
-                    <option value="">Add surface...</option>
-                    {walls.filter(w => w.groupId !== g.id).map(w => (
-                      <option key={w.id} value={w.id}>{w.id}</option>
-                    ))}
-                  </select>
-                </li>
-              </ul>
-            </div>
-          ))}
-          {walls.filter(w => !w.groupId).length > 0 && (
-            <div className="group-section">
-              <div className="group-header"><span>Other</span></div>
-              <ul className="group-surfaces">
-                {walls.filter(w => !w.groupId).map(w => (
-                  <li key={w.id}>
-                    <label>
-                      <input type="checkbox" checked={w.enabled} onChange={() => toggleWall(w.id)} /> {w.id}
-                    </label>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-        </div>
       </div>
+      {sidebarContainer && createPortal(groupsSidebar, sidebarContainer)}
     </div>
   );
 }
