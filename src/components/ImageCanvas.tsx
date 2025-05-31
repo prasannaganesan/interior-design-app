@@ -601,6 +601,13 @@ export default function ImageCanvas({ imageUrl, selectedColor, whiteBalance, lig
     saveToHistory(base ?? undefined);
   };
 
+  const removeWall = (wallId: string) => {
+    const updated = walls.filter(w => w.id !== wallId);
+    setWalls(updated);
+    const base = reapplyWalls(updated);
+    saveToHistory(base ?? undefined);
+  };
+
   const addGroup = () => {
     const name = prompt('Group name?');
     if (!name) return;
@@ -624,6 +631,26 @@ export default function ImageCanvas({ imageUrl, selectedColor, whiteBalance, lig
       saveToHistory();
     }
 
+  };
+
+  const handleDragStart = (
+    e: React.DragEvent<HTMLLIElement>,
+    wallId: string
+  ) => {
+    e.dataTransfer.setData('text/plain', wallId);
+  };
+
+  const handleDrop = (
+    e: React.DragEvent<HTMLUListElement>,
+    groupId: string | null
+  ) => {
+    e.preventDefault();
+    const id = e.dataTransfer.getData('text/plain');
+    if (id) assignWallToGroup(id, groupId);
+  };
+
+  const allowDrop = (e: React.DragEvent) => {
+    e.preventDefault();
   };
 
   const previewGroupColor = (groupId: string, color: string) => {
@@ -688,41 +715,48 @@ export default function ImageCanvas({ imageUrl, selectedColor, whiteBalance, lig
               onChangeComplete={c => commitGroupColor(g.id, c)}
             />
           </div>
-          <ul className="group-surfaces">
+          <ul
+            className="group-surfaces"
+            onDragOver={allowDrop}
+            onDrop={e => handleDrop(e, g.id)}
+          >
             {walls.filter(w => w.groupId === g.id).map(w => (
-              <li key={w.id}>
+              <li key={w.id} draggable onDragStart={e => handleDragStart(e, w.id)}>
                 <label>
                   <input type="checkbox" checked={w.enabled} onChange={() => toggleWall(w.id)} /> {w.id}
                 </label>
                 <button
                   className="remove-btn"
-                  title="Remove surface from group"
-                  onClick={() => assignWallToGroup(w.id, null)}
+                  title="Delete surface"
+                  onClick={() => removeWall(w.id)}
                 >
                   <TrashIcon />
                 </button>
               </li>
             ))}
-            <li>
-              <select onChange={e => { const wid = e.target.value; if (wid) { assignWallToGroup(wid, g.id); e.target.value=''; } }}>
-                <option value="">Add surface...</option>
-                {walls.filter(w => w.groupId !== g.id).map(w => (
-                  <option key={w.id} value={w.id}>{w.id}</option>
-                ))}
-              </select>
-            </li>
           </ul>
         </div>
       ))}
       {walls.filter(w => !w.groupId).length > 0 && (
         <div className="group-section">
           <div className="group-header"><span>Other</span></div>
-          <ul className="group-surfaces">
+          <ul
+            className="group-surfaces"
+            onDragOver={allowDrop}
+            onDrop={e => handleDrop(e, null)}
+          >
             {walls.filter(w => !w.groupId).map(w => (
-              <li key={w.id}>
+              <li key={w.id} draggable onDragStart={e => handleDragStart(e, w.id)}>
                 <label>
                   <input type="checkbox" checked={w.enabled} onChange={() => toggleWall(w.id)} /> {w.id}
                 </label>
+                <button
+                  className="remove-btn"
+                  title="Delete surface"
+                  onClick={() => removeWall(w.id)}
+                >
+                  <TrashIcon />
+                </button>
               </li>
             ))}
           </ul>
