@@ -115,23 +115,27 @@ export default function ImageCanvas({ imageUrl, selectedColor, whiteBalance, lig
   useEffect(() => {
     async function initSAM() {
       try {
+        setIsProcessing(true);
         setStatus('Initializing SAM2...');
         // Start with tiny model for faster loading
         const modelInfo = AVAILABLE_MODELS[0];
         const { encoderPath, decoderPath } = await getModelFiles(modelInfo);
-        
+
         const samInstance = new SAM2({
           encoderPath,
           decoderPath,
           modelSize: modelInfo.size
         });
-        
+
+        setStatus('Loading SAM2 model...');
         await samInstance.initialize();
         setSam(samInstance);
         setStatus('SAM2 initialized');
       } catch (error) {
         console.error('Failed to initialize SAM2:', error);
         setStatus('Failed to initialize SAM2');
+      } finally {
+        setIsProcessing(false);
       }
     }
 
@@ -320,6 +324,9 @@ export default function ImageCanvas({ imageUrl, selectedColor, whiteBalance, lig
 
   const handleMouseDown = async (e: React.MouseEvent<HTMLCanvasElement>) => {
     if (!sam || isProcessing) return;
+
+    // Cancel any pending hover highlight
+    clearHover();
 
     const canvas = canvasRef.current;
     if (!canvas || !originalImageData) return;
