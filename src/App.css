@@ -19,7 +19,7 @@ h1 {
 
 .main-content {
   display: grid;
-  grid-template-columns: 320px 1fr;
+  grid-template-columns: 320px 1fr 320px;
   gap: var(--spacing-lg);
   min-height: 600px;
   align-items: flex-start;
