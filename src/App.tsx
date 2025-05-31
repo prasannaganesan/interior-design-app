@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import './App.css'
 import ImageCanvas from './components/ImageCanvas'
 import ColorPicker from './components/ColorPicker'
@@ -10,6 +10,7 @@ function App() {
   const [selectedColor, setSelectedColor] = useState<string>('#ffffff')
   const [whiteBalance, setWhiteBalance] = useState<WhiteBalance>({ r: 1, g: 1, b: 1 })
   const [lighting, setLighting] = useState('normal')
+  const sidebarRef = useRef<HTMLDivElement>(null)
 
   const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
@@ -92,6 +93,7 @@ function App() {
               selectedColor={selectedColor}
               whiteBalance={whiteBalance}
               lighting={lighting}
+              sidebarContainer={sidebarRef.current}
             />
           ) : (
             <div className="upload-placeholder">
@@ -99,6 +101,7 @@ function App() {
             </div>
           )}
         </div>
+        <div ref={sidebarRef} className="sidebar" />
       </div>
     </div>
   )
