@@ -23,6 +23,7 @@ h1 {
   align-items: center;
   justify-content: center;
   margin-bottom: 1.5rem;
+  padding-top: var(--spacing-md);
 }
 
 .nav-menu {
@@ -51,8 +52,9 @@ h1 {
   position: absolute;
   top: 100%;
   left: 0;
-  background: #fff;
+  background: #fafafa;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+  border: 1px solid #ddd;
   border-radius: 6px;
   padding: 0.5rem 0;
   z-index: 1000;
