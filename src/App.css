@@ -471,9 +471,10 @@ h2 {
   gap: var(--spacing-md);
   background: #fafafa;
   border-left: 1px solid #e0e0e0;
-  padding-left: var(--spacing-md);
+  padding: var(--spacing-lg) var(--spacing-md);
   /* Allow popups like the color picker to extend outside */
   overflow: visible;
+  min-height: 400px;
 }
 
 .add-group {
@@ -529,9 +530,11 @@ h2 {
   padding: 2px;
   display: flex;
   align-items: center;
+  background-color: transparent;
 }
 
 .remove-btn:hover {
+  background-color: transparent;
   color: var(--accent-hover);
 }
 
@@ -579,7 +582,7 @@ h2 {
     width: 100%;
     max-width: none;
     border-left: none;
-    padding-left: 0;
+    padding: var(--spacing-lg) var(--spacing-md);
   }
   .canvas-content {
     flex-direction: column;
