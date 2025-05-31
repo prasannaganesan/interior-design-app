@@ -674,7 +674,7 @@ export default function ImageCanvas({ imageUrl, selectedColor, whiteBalance, lig
 
   const groupsSidebar = (
     <>
-      <button className="add-group" onClick={addGroup}>
+      <button className="add-group" onClick={addGroup} title="Add group">
         <PlusIcon />
         <span>Add Group</span>
       </button>
