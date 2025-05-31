@@ -95,7 +95,6 @@ export default function ImageCanvas({ imageUrl, selectedColor, whiteBalance, lig
   const [status, setStatus] = useState<string>('');
   const [walls, setWalls] = useState<WallSurface[]>([]);
   const [groups, setGroups] = useState<WallGroup[]>([]);
-  const [selectedWall, setSelectedWall] = useState<string | null>(null);
 
   const retinexRef = useRef<{
     L: Float32Array;
@@ -222,7 +221,6 @@ export default function ImageCanvas({ imageUrl, selectedColor, whiteBalance, lig
 
       setWalls([]);
       setGroups([]);
-      setSelectedWall(null);
 
       if (sam) {
         try {
@@ -244,17 +242,6 @@ export default function ImageCanvas({ imageUrl, selectedColor, whiteBalance, lig
   }
   process();
 }, [rawImageData, whiteBalance, sam]);
-
-  useEffect(() => {
-    // Update wall color when selected color changes and a wall without a group is selected
-    if (selectedWall && selectedColor) {
-      const wall = walls.find(w => w.id === selectedWall);
-      if (wall && !wall.groupId) {
-        recolorWall(wall, selectedColor);
-      }
-    }
-  }, [selectedColor, selectedWall, walls]);
-
 
   const hoverTimer = useRef<number | null>(null);
 
@@ -384,7 +371,6 @@ export default function ImageCanvas({ imageUrl, selectedColor, whiteBalance, lig
         groupId: null
       };
       setWalls([...walls, newWall]);
-      setSelectedWall(newWall.id);
 
       // Save to history
       saveToHistory();
@@ -606,8 +592,7 @@ export default function ImageCanvas({ imageUrl, selectedColor, whiteBalance, lig
     const name = prompt('Group name?');
     if (!name) return;
     const id = `group-${Date.now()}`;
-    const wallColor = selectedWall ? walls.find(w => w.id === selectedWall)?.color : null;
-    const groupColor = wallColor || selectedColor;
+    const groupColor = selectedColor;
     const group: WallGroup = { id, name, color: groupColor };
     setGroups([...groups, group]);
   };
@@ -626,10 +611,6 @@ export default function ImageCanvas({ imageUrl, selectedColor, whiteBalance, lig
       saveToHistory();
     }
 
-    // Prevent future color changes from affecting this wall unintentionally
-    if (selectedWall === wallId) {
-      setSelectedWall(null);
-    }
   };
 
   const previewGroupColor = (groupId: string, color: string) => {
@@ -664,7 +645,6 @@ export default function ImageCanvas({ imageUrl, selectedColor, whiteBalance, lig
     setCurrentHistoryIndex(0);
     setWalls([]);
     setGroups([]);
-    setSelectedWall(null);
     applyLighting(ctx, canvas.width, canvas.height, lighting);
   };
 
@@ -685,12 +665,6 @@ export default function ImageCanvas({ imageUrl, selectedColor, whiteBalance, lig
         <button onClick={undo} disabled={currentHistoryIndex <= 0 || isProcessing}>Undo</button>
         <button onClick={redo} disabled={currentHistoryIndex >= history.length - 1 || isProcessing}>Redo</button>
         <button onClick={reset} disabled={isProcessing}>Reset</button>
-        {selectedWall && (
-          <span className="selected-wall">
-            Selected: {selectedWall}{' '}
-            <button onClick={() => setSelectedWall(null)}>Clear Selection</button>
-          </span>
-        )}
       </div>
       <div className="canvas-content">
         <div className="canvas-area">
