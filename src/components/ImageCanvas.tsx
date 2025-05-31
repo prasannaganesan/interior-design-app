@@ -25,7 +25,8 @@ const LIGHTING_SETTINGS: Record<string, LightingPreset> = {
   morning: { r: 1.1, g: 1.05, b: 0.95, brightness: 1.1 },
   afternoon: { r: 1.05, g: 1.05, b: 1.1, brightness: 1 },
   evening: { r: 1.1, g: 0.9, b: 0.8, brightness: 1 },
-  night: { r: 1.15, g: 1, b: 0.85, brightness: 0.7 },
+  // Night mode simulates indoor LED lighting rather than moonlight
+  night: { r: 0.9, g: 0.95, b: 1.1, brightness: 0.8 },
   cloudy: { r: 0.95, g: 1, b: 1.1, brightness: 0.95 }
 };
 
