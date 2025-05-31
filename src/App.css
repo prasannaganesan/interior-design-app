@@ -1,14 +1,13 @@
 #root {
   width: 100%;
-  padding: 2rem;
+  padding: var(--spacing-lg);
   box-sizing: border-box;
 }
 
 .app-container {
   width: 100%;
-  max-width: 1400px;
-  margin: 0 auto;
-  padding: 2rem;
+  margin: 0;
+  padding: var(--spacing-lg);
   box-sizing: border-box;
 }
 
@@ -19,11 +18,11 @@ h1 {
 }
 
 .main-content {
-  display: flex;
-  gap: 2rem;
+  display: grid;
+  grid-template-columns: 320px 1fr 320px;
+  gap: var(--spacing-lg);
   min-height: 600px;
   align-items: flex-start;
-  flex-wrap: wrap;
 }
 
 .controls-panel {
@@ -264,7 +263,6 @@ h2 {
 }
 
 .canvas-container {
-  flex: 3 1 400px;
   background-color: #fff;
   border-radius: 12px;
   display: flex;
@@ -277,7 +275,7 @@ h2 {
 .canvas-wrapper {
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: var(--spacing-md);
   width: 100%;
   height: 100%;
 }
@@ -310,6 +308,12 @@ h2 {
 
 .canvas-controls button:active {
   transform: translateY(1px);
+}
+
+.canvas-content {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--spacing-md);
 }
 
 .preview-image {
@@ -398,10 +402,11 @@ h2 {
 }
 
 .sidebar {
+  width: 320px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  margin-top: 1rem;
+  gap: var(--spacing-md);
+  overflow-y: auto;
 }
 
 .add-group {
@@ -445,6 +450,7 @@ h2 {
   position: relative;
   display: flex;
   justify-content: center;
+  flex: 1;
 }
 
 .processing-overlay {
@@ -476,10 +482,15 @@ h2 {
 
 @media (max-width: 768px) {
   .main-content {
-    flex-direction: column;
+    grid-template-columns: 1fr;
   }
-  .controls-panel, .canvas-container {
-    max-width: none;
+  .controls-panel,
+  .canvas-container,
+  .sidebar {
     width: 100%;
+    max-width: none;
+  }
+  .canvas-content {
+    flex-direction: column;
   }
 }
