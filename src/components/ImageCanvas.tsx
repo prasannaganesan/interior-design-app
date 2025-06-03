@@ -125,18 +125,17 @@ export default function ImageCanvas({ imageUrl, selectedColor, whiteBalance, lig
         setStatus('Initializing SAM2...');
         // Start with tiny model for faster loading
         const modelInfo = AVAILABLE_MODELS[0];
-        const { encoderPath, decoderPath } = await getModelFiles(modelInfo);
+        const { encoderPath, decoderPath } = await getModelFiles(modelInfo, setStatus);
 
         const samInstance = new SAM2({
           encoderPath,
           decoderPath,
-          modelSize: modelInfo.size
+          modelSize: modelInfo.size,
+          onStatus: setStatus
         });
 
-        setStatus('Loading SAM2 model...');
         await samInstance.initialize();
         setSam(samInstance);
-        setStatus('SAM2 initialized');
       } catch (error) {
         console.error('Failed to initialize SAM2:', error);
         setStatus('Failed to initialize SAM2');

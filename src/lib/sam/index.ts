@@ -4,6 +4,7 @@ interface SAMModelConfig {
   encoderPath: string;
   decoderPath: string;
   modelSize: 'tiny' | 'base' | 'large';
+  onStatus?: (msg: string) => void;
 }
 
 interface ImageEmbedding {
@@ -17,6 +18,7 @@ export class SAM2 {
   private decoderSession: ort.InferenceSession | null = null;
   private imageEmbedding: ImageEmbedding | null = null;
   private modelConfig: SAMModelConfig;
+  private onStatus: (msg: string) => void;
   // Store original image size and preprocessing parameters
   private origWidth = 0;
   private origHeight = 0;
@@ -27,15 +29,18 @@ export class SAM2 {
 
   constructor(config: SAMModelConfig) {
     this.modelConfig = config;
+    this.onStatus = config.onStatus ?? (() => {});
   }
 
   async initialize() {
     try {
       console.debug('Starting SAM2 initialization...');
+      this.onStatus('Starting SAM2 initialization...');
 
       // Configure ONNX Runtime environment before creating any sessions
       if (!SAM2.isInitialized) {
         console.debug('Configuring ONNX Runtime environment...');
+        this.onStatus('Configuring ONNX Runtime environment...');
         
         // Enable optimization features
         ort.env.wasm.simd = true;
@@ -49,6 +54,7 @@ export class SAM2 {
 
         SAM2.isInitialized = true;
         console.debug('ONNX Runtime environment configured');
+        this.onStatus('ONNX Runtime environment configured');
       }
 
       // Configure session options
@@ -59,21 +65,26 @@ export class SAM2 {
 
       // Initialize encoder
       console.debug('Loading encoder from:', this.modelConfig.encoderPath);
+      this.onStatus('Loading encoder...');
       this.encoderSession = await ort.InferenceSession.create(
         this.modelConfig.encoderPath,
         options
       );
       console.debug('Encoder loaded successfully');
+      this.onStatus('Encoder loaded');
       
       // Initialize decoder
       console.debug('Loading decoder from:', this.modelConfig.decoderPath);
+      this.onStatus('Loading decoder...');
       this.decoderSession = await ort.InferenceSession.create(
         this.modelConfig.decoderPath,
         options
       );
       console.debug('Decoder loaded successfully');
+      this.onStatus('Decoder loaded');
       
       console.debug('Successfully initialized SAM2');
+      this.onStatus('SAM2 initialized');
     } catch (error) {
       console.error('Failed to initialize:', error);
       throw error;
@@ -87,6 +98,7 @@ export class SAM2 {
 
     try {
       console.debug('Preprocessing image...');
+      this.onStatus('Preprocessing image...');
       const { tensor, scale, offsetX, offsetY } = await this.preprocessImage(imageData);
 
       // Store original size and preprocessing params
@@ -97,6 +109,7 @@ export class SAM2 {
       this.offsetY = offsetY;
       
       console.debug('Running encoder...');
+      this.onStatus('Running encoder...');
       const feeds = { image: tensor };
       const results = await this.encoderSession.run(feeds);
 
@@ -110,6 +123,7 @@ export class SAM2 {
         image_embed: results[this.encoderSession.outputNames[2]]
       };
       console.debug('Successfully generated embeddings');
+      this.onStatus('Embeddings generated');
     } catch (error) {
       console.error('Error in generateEmbedding:', error);
       throw new Error(`Failed to generate embeddings: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -126,6 +140,7 @@ export class SAM2 {
 
     try {
       console.debug('Preparing inputs for mask generation...');
+      this.onStatus('Preparing inputs for mask generation...');
       // Prepare point input
       // Convert point to preprocessing coordinates
       const scaledX = point.x * this.scale + this.offsetX;
@@ -151,6 +166,7 @@ export class SAM2 {
       );
 
       console.debug('Running decoder...');
+      this.onStatus('Running decoder...');
       const feeds = {
         image_embed: this.imageEmbedding.image_embed,
         high_res_feats_0: this.imageEmbedding.high_res_feats_0,
@@ -169,6 +185,7 @@ export class SAM2 {
       }
 
       console.debug('Processing decoder output...');
+      this.onStatus('Processing decoder output...');
       const masks = result.masks;
       const scores = result.iou_predictions.data;
       const bestMaskIdx = scores.indexOf(Math.max(...scores));

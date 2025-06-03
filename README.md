@@ -80,6 +80,28 @@ npm run build
 npm run preview  # to preview the build
 ```
 
+## Enabling WebAssembly Multi-Threading
+
+ONNX Runtime can leverage WebAssembly threads for better performance. Browsers
+require the page to be **cross-origin isolated** to enable this feature. When
+deploying to platforms like Vercel, ensure the following headers are served:
+
+```
+Cross-Origin-Opener-Policy: same-origin
+Cross-Origin-Embedder-Policy: require-corp
+```
+
+If you cannot configure headers directly, you can register a small service
+worker using [`coi-serviceworker`](https://github.com/gzuidhof/coi-serviceworker)
+before loading the app:
+
+```html
+<script src="https://unpkg.com/coi-serviceworker" defer></script>
+```
+
+Once the page is cross-origin isolated, the app will use four WASM threads as
+configured in `src/lib/sam/index.ts`.
+
 ## License
 
 MIT
