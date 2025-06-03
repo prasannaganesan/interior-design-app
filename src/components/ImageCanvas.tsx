@@ -100,6 +100,7 @@ export default function ImageCanvas({ imageUrl, selectedColor, whiteBalance, lig
   const [groups, setGroups] = useState<WallGroup[]>([]);
   const [newGroupName, setNewGroupName] = useState('');
   const [editingNames, setEditingNames] = useState<Record<string, string>>({});
+  const surfaceCounter = useRef(1);
 
   const retinexRef = useRef<{
     L: Float32Array;
@@ -376,13 +377,13 @@ export default function ImageCanvas({ imageUrl, selectedColor, whiteBalance, lig
         historyImage = updated;
       }
 
-      const newWall: WallSurface = {
-        id: `wall-${Date.now()}`,
-        pixels: indices,
-        color: selectedColor,
-        enabled: true,
-        groupId: null
-      };
+        const newWall: WallSurface = {
+          id: `Surface ${surfaceCounter.current++}`,
+          pixels: indices,
+          color: selectedColor,
+          enabled: true,
+          groupId: null
+        };
       setWalls([...walls, newWall]);
 
       // Save to history
