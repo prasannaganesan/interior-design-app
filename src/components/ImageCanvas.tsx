@@ -907,6 +907,9 @@ export default function ImageCanvas({ imageUrl, selectedColor, whiteBalance, lig
               <span>{status}</span>
             </div>
           )}
+          {!isProcessing && status && (
+            <div className="status-bar">{status}</div>
+          )}
         </div>
       </div>
       {sidebarContainer && createPortal(groupsSidebar, sidebarContainer)}
