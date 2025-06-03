@@ -55,13 +55,14 @@ export default function DesignPage() {
     <div className="main-content">
       <div className="controls-panel">
         <div className="upload-section panel-section">
-          <h2>Upload Image</h2>
+          <h2>Load Image</h2>
           <input
             type="file"
             accept="image/*"
             onChange={handleImageUpload}
             className="file-input"
           />
+          <p className="local-note">All image processing happens locally in your browser.</p>
         </div>
         <div className="color-picker-section panel-section">
           <h2>Select Surface Color</h2>
@@ -94,7 +95,7 @@ export default function DesignPage() {
           />
         ) : (
           <div className="upload-placeholder">
-            <p>Upload an image to begin</p>
+            <p>Load an image to begin</p>
           </div>
         )}
       </div>
