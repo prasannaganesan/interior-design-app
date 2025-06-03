@@ -12,6 +12,7 @@ import {
   hexToLab,
   boxBlurFloat
 } from '../lib/color';
+import { NIIDNet, applyReflectanceColor } from '../lib/intrinsic';
 
 import { type WhiteBalance } from './WhiteBalanceControls';
 
@@ -62,6 +63,7 @@ interface ImageCanvasProps {
   selectedColor: string;
   whiteBalance: WhiteBalance;
   lighting: string;
+  algorithm: string;
   sidebarContainer?: HTMLElement | null;
 }
 
@@ -86,7 +88,7 @@ interface WallGroup {
 }
 
 
-export default function ImageCanvas({ imageUrl, selectedColor, whiteBalance, lighting, sidebarContainer }: ImageCanvasProps) {
+export default function ImageCanvas({ imageUrl, selectedColor, whiteBalance, lighting, algorithm, sidebarContainer }: ImageCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [rawImageData, setRawImageData] = useState<ImageData | null>(null);
   const [originalImageData, setOriginalImageData] = useState<ImageData | null>(null);
@@ -94,6 +96,7 @@ export default function ImageCanvas({ imageUrl, selectedColor, whiteBalance, lig
   const [history, setHistory] = useState<HistoryState[]>([]);
   const [currentHistoryIndex, setCurrentHistoryIndex] = useState(-1);
   const [sam, setSam] = useState<SAM2 | null>(null);
+  const [niid, setNiid] = useState<NIIDNet | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [status, setStatus] = useState<string>('');
   const trimmedStatus = status.trim();
@@ -116,11 +119,38 @@ export default function ImageCanvas({ imageUrl, selectedColor, whiteBalance, lig
     shade: Float32Array;
   } | null>(null);
 
+  const intrinsicRef = useRef<{
+    R: Float32Array;
+    S: Float32Array;
+    E: Float32Array;
+  } | null>(null);
+
   // Radius used for the Retinex illumination estimate. A smaller
   // radius reduces over-blurring which previously caused the wall's
   // mean lightness to become unrealistically small and led to washed
   // out recoloring.
   const RETINEX_BLUR_RADIUS = 15;
+
+  useEffect(() => {
+    if (algorithm !== 'intrinsic') return;
+    async function initNIID() {
+      try {
+        setIsProcessing(true);
+        setStatus('Loading NIID-Net...');
+        const modelUrl = '/models/niid-net-lite.onnx';
+        const n = new NIIDNet(modelUrl);
+        await n.initialize();
+        setNiid(n);
+        setStatus('NIID-Net loaded');
+      } catch (err) {
+        console.error('Failed to load NIID-Net', err);
+        setStatus('Failed to load NIID-Net');
+      } finally {
+        setTimeout(() => setIsProcessing(false), 500);
+      }
+    }
+    initNIID();
+  }, [algorithm]);
 
   // Initialize SAM2
   useEffect(() => {
@@ -188,6 +218,16 @@ export default function ImageCanvas({ imageUrl, selectedColor, whiteBalance, lig
         setOriginalImageData(balancedData);
         ctx.putImageData(balancedData, 0, 0);
 
+        if (algorithm === 'intrinsic' && niid) {
+          setStatus('Running NIID-Net...');
+          const result = await niid.decompose(balancedData);
+          intrinsicRef.current = {
+            R: result.reflectance,
+            S: result.shading,
+            E: result.specular
+          };
+        }
+
       const { data } = balancedData;
       const size = canvas.width * canvas.height;
       const logR = new Float32Array(size);
@@ -254,7 +294,7 @@ export default function ImageCanvas({ imageUrl, selectedColor, whiteBalance, lig
     }
   }
   process();
-}, [rawImageData, whiteBalance, sam]);
+}, [rawImageData, whiteBalance, sam, algorithm, niid]);
 
   const hoverTimer = useRef<number | null>(null);
 
@@ -375,7 +415,20 @@ export default function ImageCanvas({ imageUrl, selectedColor, whiteBalance, lig
           baseImageData.width,
           baseImageData.height
         );
-        applyRetinexRecolor(updated, indices, selectedColor);
+        if (algorithm === 'intrinsic' && intrinsicRef.current) {
+          applyReflectanceColor(
+            updated,
+            {
+              R: intrinsicRef.current.R,
+              S: intrinsicRef.current.S,
+              E: intrinsicRef.current.E
+            },
+            indices,
+            selectedColor
+          );
+        } else {
+          applyRetinexRecolor(updated, indices, selectedColor);
+        }
         setBaseImageData(updated);
         ctx.putImageData(updated, 0, 0);
         applyLighting(ctx, canvas.width, canvas.height, lighting);
@@ -501,7 +554,16 @@ export default function ImageCanvas({ imageUrl, selectedColor, whiteBalance, lig
       baseImageData.width,
       baseImageData.height
     );
-    applyRetinexRecolor(updated, wall.pixels, newColor);
+    if (algorithm === 'intrinsic' && intrinsicRef.current) {
+      applyReflectanceColor(
+        updated,
+        intrinsicRef.current,
+        wall.pixels,
+        newColor
+      );
+    } else {
+      applyRetinexRecolor(updated, wall.pixels, newColor);
+    }
     setBaseImageData(updated);
     wall.color = newColor;
     setWalls(walls.map(w => (w.id === wall.id ? wall : w)));
@@ -530,7 +592,16 @@ export default function ImageCanvas({ imageUrl, selectedColor, whiteBalance, lig
     );
     for (const wall of wallList) {
       if (!wall.enabled) continue;
-      applyRetinexRecolor(base, wall.pixels, wall.color);
+      if (algorithm === 'intrinsic' && intrinsicRef.current) {
+        applyReflectanceColor(
+          base,
+          intrinsicRef.current,
+          wall.pixels,
+          wall.color
+        );
+      } else {
+        applyRetinexRecolor(base, wall.pixels, wall.color);
+      }
     }
     setBaseImageData(base);
     ctx.putImageData(base, 0, 0);
@@ -723,6 +794,7 @@ export default function ImageCanvas({ imageUrl, selectedColor, whiteBalance, lig
       originalImageData.height
     );
     setBaseImageData(base);
+    intrinsicRef.current = null;
     ctx.putImageData(base, 0, 0);
     setHistory([{ imageData: base, timestamp: Date.now() }]);
     setCurrentHistoryIndex(0);

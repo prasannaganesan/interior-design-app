@@ -3,12 +3,14 @@ import ImageCanvas from '../components/ImageCanvas'
 import ColorPicker from '../components/ColorPicker'
 import WhiteBalanceControls, { type WhiteBalance } from '../components/WhiteBalanceControls'
 import LightingSelector from '../components/LightingSelector'
+import AlgorithmSelector from '../components/AlgorithmSelector'
 
 export default function DesignPage() {
   const [selectedImage, setSelectedImage] = useState<string | null>(null)
   const [selectedColor, setSelectedColor] = useState<string>('#ffffff')
   const [whiteBalance, setWhiteBalance] = useState<WhiteBalance>({ r: 1, g: 1, b: 1 })
   const [lighting, setLighting] = useState('normal')
+  const [algorithm, setAlgorithm] = useState('retinex')
   const sidebarRef = useRef<HTMLDivElement>(null)
 
   const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -83,6 +85,7 @@ export default function DesignPage() {
           />
         </div>
         <LightingSelector value={lighting} onChange={setLighting} className="panel-section" />
+        <AlgorithmSelector value={algorithm} onChange={setAlgorithm} className="panel-section" />
       </div>
       <div className="canvas-container">
         {selectedImage ? (
@@ -91,6 +94,7 @@ export default function DesignPage() {
             selectedColor={selectedColor}
             whiteBalance={whiteBalance}
             lighting={lighting}
+            algorithm={algorithm}
             sidebarContainer={sidebarRef.current}
           />
         ) : (
