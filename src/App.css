@@ -587,6 +587,13 @@ h2 {
   align-items: center;
   gap: 6px;
   margin-bottom: 4px;
+  border-left: 4px solid var(--accent-color);
+  padding-left: 6px;
+  cursor: grab;
+}
+
+.group-surfaces li:active {
+  cursor: grabbing;
 }
 
 .remove-btn {

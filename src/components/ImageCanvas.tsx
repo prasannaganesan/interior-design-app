@@ -721,7 +721,14 @@ export default function ImageCanvas({ imageUrl, selectedColor, whiteBalance, lig
             onDrop={e => handleDrop(e, g.id)}
           >
             {walls.filter(w => w.groupId === g.id).map(w => (
-              <li key={w.id} draggable onDragStart={e => handleDragStart(e, w.id)}>
+              <li
+                key={w.id}
+                className="draggable"
+                draggable
+                onDragStart={e => handleDragStart(e, w.id)}
+                onDragOver={allowDrop}
+                onDrop={e => handleDrop(e, g.id)}
+              >
                 <label>
                   <input type="checkbox" checked={w.enabled} onChange={() => toggleWall(w.id)} /> {w.id}
                 </label>
@@ -746,7 +753,14 @@ export default function ImageCanvas({ imageUrl, selectedColor, whiteBalance, lig
             onDrop={e => handleDrop(e, null)}
           >
             {walls.filter(w => !w.groupId).map(w => (
-              <li key={w.id} draggable onDragStart={e => handleDragStart(e, w.id)}>
+              <li
+                key={w.id}
+                className="draggable"
+                draggable
+                onDragStart={e => handleDragStart(e, w.id)}
+                onDragOver={allowDrop}
+                onDrop={e => handleDrop(e, null)}
+              >
                 <label>
                   <input type="checkbox" checked={w.enabled} onChange={() => toggleWall(w.id)} /> {w.id}
                 </label>
