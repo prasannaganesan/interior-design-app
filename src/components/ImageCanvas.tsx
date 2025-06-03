@@ -645,14 +645,26 @@ export default function ImageCanvas({ imageUrl, selectedColor, whiteBalance, lig
     const wall = walls.find(w => w.id === wallId);
     if (!wall) return;
 
-    const newColor = groupId ? (groups.find(g => g.id === groupId)?.color || wall.color) : wall.color;
-    const updatedWall = { ...wall, groupId, color: newColor };
+    const newColor = groupId
+      ? groups.find(g => g.id === groupId)?.color || wall.color
+      : wall.color;
+    const updatedWall = { ...wall, groupId, color: newColor, enabled: true };
 
-    if (newColor !== wall.color) {
+    if (wall.enabled && newColor === wall.color) {
+      setWalls(walls.map(w => (w.id === wallId ? updatedWall : w)));
+      saveToHistory();
+      return;
+    }
+
+    if (wall.enabled) {
       recolorWall(updatedWall, newColor);
     } else {
-      setWalls(walls.map(w => w.id === wallId ? updatedWall : w));
-      saveToHistory();
+      const updatedWalls = walls.map(w =>
+        w.id === wallId ? updatedWall : w
+      );
+      setWalls(updatedWalls);
+      const base = reapplyWalls(updatedWalls);
+      saveToHistory(base ?? undefined);
     }
 
   };
@@ -733,17 +745,18 @@ export default function ImageCanvas({ imageUrl, selectedColor, whiteBalance, lig
         Drag surfaces here to organize them. Edit the names below and use the
         color picker to set a group's color.
       </p>
+      <h3>Add Group</h3>
       <div className="add-group-row">
         <input
           type="text"
           className="group-name-input"
-          placeholder="New group name"
+          placeholder="Enter group name"
           value={newGroupName}
           onChange={e => setNewGroupName(e.target.value)}
         />
         <button className="add-group" onClick={addGroup} title="Add group">
           <PlusIcon />
-          <span>Add Group</span>
+          <span>Add</span>
         </button>
       </div>
       {groups.map(g => (
