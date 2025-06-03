@@ -675,15 +675,13 @@ h2 {
 }
 
 .status-bar {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  padding: 0.25rem 0;
+  margin-top: var(--spacing-sm);
   text-align: center;
   font-size: 0.9rem;
   color: #333;
   background: rgba(255, 255, 255, 0.9);
+  padding: 0.25rem 0;
+  border-radius: 6px;
   pointer-events: none;
 }
 
@@ -695,6 +693,13 @@ h2 {
   border-radius: 50%;
   animation: spin 1s linear infinite;
   margin-bottom: 0.5rem;
+}
+
+.spinner-large {
+  width: 80px;
+  height: 80px;
+  border-width: 6px;
+  margin-bottom: 1rem;
 }
 
 @keyframes spin {

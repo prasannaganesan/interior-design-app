@@ -903,15 +903,15 @@ export default function ImageCanvas({ imageUrl, selectedColor, whiteBalance, lig
           />
           {isProcessing && (
             <div className="processing-overlay">
-              <div className="spinner" />
+              <div
+                className={`spinner${!sam ? ' spinner-large' : ''}`}
+              />
               <span>{status}</span>
             </div>
           )}
-          {!isProcessing && status && (
-            <div className="status-bar">{status}</div>
-          )}
         </div>
       </div>
+      {!isProcessing && status && <div className="status-bar">{status}</div>}
       {sidebarContainer && createPortal(groupsSidebar, sidebarContainer)}
     </div>
   );
