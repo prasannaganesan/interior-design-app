@@ -22,18 +22,32 @@ export const AVAILABLE_MODELS: ModelInfo[] = [
   }
 ];
 
-export async function getModelFiles(modelInfo: ModelInfo): Promise<{ encoderPath: string, decoderPath: string }> {
+export async function getModelFiles(
+  modelInfo: ModelInfo,
+  onStatus?: (msg: string) => void
+): Promise<{ encoderPath: string, decoderPath: string }> {
+  const updateStatus = onStatus ?? (() => {});
   try {
     // First try using Origin Private File System
     if ('showDirectoryPicker' in window && 'storage' in navigator) {
       try {
         const root = await navigator.storage.getDirectory();
         const modelDir = await root.getDirectoryHandle(MODEL_STORE, { create: true });
-        
+
         // Check if models are already cached
-        const encoderPath = await getCachedModel(modelDir, modelInfo.encoderUrl, `${modelInfo.size}-encoder`);
-        const decoderPath = await getCachedModel(modelDir, modelInfo.decoderUrl, `${modelInfo.size}-decoder`);
-        
+        const encoderPath = await getCachedModel(
+          modelDir,
+          modelInfo.encoderUrl,
+          `${modelInfo.size}-encoder`,
+          updateStatus
+        );
+        const decoderPath = await getCachedModel(
+          modelDir,
+          modelInfo.decoderUrl,
+          `${modelInfo.size}-decoder`,
+          updateStatus
+        );
+
         return { encoderPath, decoderPath };
       } catch (err) {
         console.warn('Failed to use Origin Private File System, falling back to direct downloads:', err);
@@ -41,7 +55,7 @@ export async function getModelFiles(modelInfo: ModelInfo): Promise<{ encoderPath
     }
 
     // Fallback: Download directly without caching
-    console.log('Using direct model downloads without caching...');
+    updateStatus('Downloading models...');
     const [encoderResponse, decoderResponse] = await Promise.all([
       fetch(modelInfo.encoderUrl),
       fetch(modelInfo.decoderUrl)
@@ -72,29 +86,30 @@ export async function getModelFiles(modelInfo: ModelInfo): Promise<{ encoderPath
 async function getCachedModel(
   modelDir: FileSystemDirectoryHandle,
   url: string,
-  filename: string
+  filename: string,
+  onStatus: (msg: string) => void
 ): Promise<string> {
   try {
     // Try to get existing file
     const fileHandle = await modelDir.getFileHandle(filename);
     const file = await fileHandle.getFile();
-    console.log(`Using cached model: ${filename}`);
+    onStatus(`Using cached model: ${filename}`);
     return URL.createObjectURL(file);
   } catch {
     // File doesn't exist, download it
-    console.log(`Downloading model ${filename}...`);
+    onStatus(`Downloading model ${filename}...`);
     const response = await fetch(url);
     if (!response.ok) {
       throw new Error(`Failed to download model: ${response.statusText} (${response.status})`);
     }
-    
+
     const blob = await response.blob();
     const fileHandle = await modelDir.getFileHandle(filename, { create: true });
     const writable = await fileHandle.createWritable();
     await writable.write(blob);
     await writable.close();
 
-    console.log(`Successfully downloaded and cached: ${filename}`);
+    onStatus(`Successfully downloaded and cached: ${filename}`);
     return URL.createObjectURL(blob);
   }
-} 
+}
