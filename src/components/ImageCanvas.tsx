@@ -659,6 +659,7 @@ export default function ImageCanvas({ imageUrl, selectedColor, whiteBalance, lig
     e: React.DragEvent<HTMLLIElement>,
     wallId: string
   ) => {
+    console.log('drag start', { wallId });
     e.dataTransfer.setData('text/plain', wallId);
   };
 
@@ -668,11 +669,13 @@ export default function ImageCanvas({ imageUrl, selectedColor, whiteBalance, lig
   ) => {
     e.preventDefault();
     const id = e.dataTransfer.getData('text/plain');
+    console.log('drop', { id, groupId });
     if (id) assignWallToGroup(id, groupId);
   };
 
   const allowDrop = (e: React.DragEvent) => {
     e.preventDefault();
+    console.log('allow drop');
   };
 
   const previewGroupColor = (groupId: string, color: string) => {
