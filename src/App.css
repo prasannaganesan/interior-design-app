@@ -569,11 +569,24 @@ h2 {
 }
 
 .group-name-input {
-  flex: 1;
+  width: 100%;
   padding: 4px 6px;
   border: 1px solid #ddd;
   border-radius: 6px;
   font-weight: 600;
+}
+
+.group-name-display {
+  font-weight: 600;
+  padding: 4px 6px;
+  cursor: text;
+}
+
+.color-picker-label {
+  display: flex;
+  flex-direction: column;
+  font-size: 0.8rem;
+  gap: 4px;
 }
 
 .group-section {
@@ -585,15 +598,18 @@ h2 {
 
 .group-header {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
+  flex-direction: column;
+  gap: 4px;
   margin-bottom: 0.25rem;
 }
 
 .group-surfaces {
   list-style: none;
-  padding: 0;
+  padding: 4px;
   margin: 0;
+  min-height: 2rem;
+  border: 1px dashed var(--accent-color);
+  border-radius: 4px;
 }
 
 .group-surfaces li {
@@ -608,6 +624,12 @@ h2 {
 
 .group-surfaces li:active {
   cursor: grabbing;
+}
+
+.group-surfaces .drop-placeholder {
+  color: #666;
+  font-style: italic;
+  padding-left: 6px;
 }
 
 .remove-btn {

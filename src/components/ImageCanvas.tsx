@@ -100,6 +100,7 @@ export default function ImageCanvas({ imageUrl, selectedColor, whiteBalance, lig
   const [groups, setGroups] = useState<WallGroup[]>([]);
   const [newGroupName, setNewGroupName] = useState('');
   const [editingNames, setEditingNames] = useState<Record<string, string>>({});
+  const [editingGroupId, setEditingGroupId] = useState<string | null>(null);
   const surfaceCounter = useRef(1);
 
   const retinexRef = useRef<{
@@ -637,6 +638,7 @@ export default function ImageCanvas({ imageUrl, selectedColor, whiteBalance, lig
     if (name !== current.name) {
       setGroups(groups.map(g => g.id === groupId ? { ...g, name } : g));
     }
+    setEditingGroupId(null);
   };
 
   const assignWallToGroup = (wallId: string, groupId: string | null) => {
@@ -747,26 +749,52 @@ export default function ImageCanvas({ imageUrl, selectedColor, whiteBalance, lig
       {groups.map(g => (
         <div key={g.id} className="group-section">
           <div className="group-header">
-            <input
-              type="text"
-              className="group-name-input"
-              value={editingNames[g.id] ?? g.name}
-              onChange={e => handleGroupNameChange(g.id, e.target.value)}
-              onBlur={() => commitGroupName(g.id)}
-              onKeyDown={e => e.key === 'Enter' && (e.currentTarget as HTMLInputElement).blur()}
-            />
-            <ColorPicker
-              value={g.color}
-              onChange={c => previewGroupColor(g.id, c)}
-              onChangeComplete={c => commitGroupColor(g.id, c)}
-            />
+            {editingGroupId === g.id ? (
+              <input
+                type="text"
+                className="group-name-input"
+                value={editingNames[g.id] ?? g.name}
+                autoFocus
+                onChange={e => handleGroupNameChange(g.id, e.target.value)}
+                onBlur={() => commitGroupName(g.id)}
+                onKeyDown={e =>
+                  e.key === 'Enter' &&
+                  (e.currentTarget as HTMLInputElement).blur()}
+              />
+            ) : (
+              <span
+                className="group-name-display"
+                onClick={() => setEditingGroupId(g.id)}
+              >
+                {g.name}
+              </span>
+            )}
+            <label className="color-picker-label">
+              Group color
+              <ColorPicker
+                value={g.color}
+                onChange={c => previewGroupColor(g.id, c)}
+                onChangeComplete={c => commitGroupColor(g.id, c)}
+              />
+            </label>
           </div>
           <ul
             className="group-surfaces"
             onDragOver={allowDrop}
             onDrop={e => handleDrop(e, g.id)}
           >
-            {walls.filter(w => w.groupId === g.id).map(w => (
+            {walls.filter(w => w.groupId === g.id).length === 0 ? (
+              <li
+                className="drop-placeholder"
+                onDragOver={allowDrop}
+                onDrop={e => handleDrop(e, g.id)}
+              >
+                Drop surfaces here
+              </li>
+            ) : (
+              walls
+                .filter(w => w.groupId === g.id)
+                .map(w => (
               <li
                 key={w.id}
                 className="draggable"
@@ -786,7 +814,8 @@ export default function ImageCanvas({ imageUrl, selectedColor, whiteBalance, lig
                   <TrashIcon />
                 </button>
               </li>
-            ))}
+                ))
+            )}
           </ul>
         </div>
       ))}
