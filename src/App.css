@@ -605,11 +605,14 @@ h2 {
   display: flex;
   align-items: center;
   background-color: transparent;
+  transition: background-color 0.2s, color 0.2s, transform 0.2s;
+  border-radius: 4px;
 }
 
 .remove-btn:hover {
-  background-color: transparent;
-  color: var(--accent-hover);
+  background-color: var(--accent-hover);
+  color: #fff;
+  transform: scale(1.1);
 }
 
 .canvas-area {
