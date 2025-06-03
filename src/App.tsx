@@ -12,6 +12,7 @@ export default function App() {
       <header className="app-header">
         <NavigationMenu onNavigate={setPage} />
         <h1>Interior Design Color Visualizer</h1>
+        <p className="app-tagline">In-browser image wizardry—no cloud required.</p>
       </header>
       {page === 'home' ? <DesignPage /> : <WhyPage />}
     </div>

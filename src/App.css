@@ -17,6 +17,13 @@ h1 {
   margin: 0;
 }
 
+.app-tagline {
+  text-align: center;
+  color: #555;
+  margin: 0.25rem 0 var(--spacing-md);
+  font-style: italic;
+}
+
 .app-header {
   position: relative;
   display: flex;
@@ -343,6 +350,13 @@ h2 {
   color: #666;
   margin: 0.5rem 0;
   font-style: italic;
+}
+
+.local-note {
+  font-size: 0.8rem;
+  color: #666;
+  margin-top: 0.5rem;
+  text-align: center;
 }
 
 .canvas-container {
