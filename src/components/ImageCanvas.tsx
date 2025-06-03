@@ -98,6 +98,8 @@ export default function ImageCanvas({ imageUrl, selectedColor, whiteBalance, lig
   const [status, setStatus] = useState<string>('');
   const [walls, setWalls] = useState<WallSurface[]>([]);
   const [groups, setGroups] = useState<WallGroup[]>([]);
+  const [newGroupName, setNewGroupName] = useState('');
+  const [editingNames, setEditingNames] = useState<Record<string, string>>({});
   const surfaceCounter = useRef(1);
 
   const retinexRef = useRef<{
@@ -610,12 +612,31 @@ export default function ImageCanvas({ imageUrl, selectedColor, whiteBalance, lig
   };
 
   const addGroup = () => {
-    const name = prompt('Group name?');
-    if (!name) return;
+    const name = newGroupName.trim();
+    if (!name || groups.some(g => g.name === name)) return;
     const id = `group-${Date.now()}`;
     const groupColor = selectedColor;
     const group: WallGroup = { id, name, color: groupColor };
     setGroups([...groups, group]);
+    setEditingNames(prev => ({ ...prev, [id]: name }));
+    setNewGroupName('');
+  };
+
+  const handleGroupNameChange = (groupId: string, name: string) => {
+    setEditingNames(prev => ({ ...prev, [groupId]: name }));
+  };
+
+  const commitGroupName = (groupId: string) => {
+    const name = (editingNames[groupId] ?? '').trim();
+    const current = groups.find(g => g.id === groupId);
+    if (!current) return;
+    if (!name || groups.some(g => g.name === name && g.id !== groupId)) {
+      setEditingNames(prev => ({ ...prev, [groupId]: current.name }));
+      return;
+    }
+    if (name !== current.name) {
+      setGroups(groups.map(g => g.id === groupId ? { ...g, name } : g));
+    }
   };
 
   const assignWallToGroup = (wallId: string, groupId: string | null) => {
@@ -642,7 +663,7 @@ export default function ImageCanvas({ imageUrl, selectedColor, whiteBalance, lig
   };
 
   const handleDrop = (
-    e: React.DragEvent<HTMLUListElement>,
+    e: React.DragEvent<HTMLElement>,
     groupId: string | null
   ) => {
     e.preventDefault();
@@ -702,14 +723,35 @@ export default function ImageCanvas({ imageUrl, selectedColor, whiteBalance, lig
 
   const groupsSidebar = (
     <>
-      <button className="add-group" onClick={addGroup} title="Add group">
-        <PlusIcon />
-        <span>Add Group</span>
-      </button>
+      <h2>Groups</h2>
+      <p className="instructions">
+        Drag surfaces here to organize them. Edit the names below and use the
+        color picker to set a group's color.
+      </p>
+      <div className="add-group-row">
+        <input
+          type="text"
+          className="group-name-input"
+          placeholder="New group name"
+          value={newGroupName}
+          onChange={e => setNewGroupName(e.target.value)}
+        />
+        <button className="add-group" onClick={addGroup} title="Add group">
+          <PlusIcon />
+          <span>Add Group</span>
+        </button>
+      </div>
       {groups.map(g => (
         <div key={g.id} className="group-section">
           <div className="group-header">
-            <span>{g.name}</span>
+            <input
+              type="text"
+              className="group-name-input"
+              value={editingNames[g.id] ?? g.name}
+              onChange={e => handleGroupNameChange(g.id, e.target.value)}
+              onBlur={() => commitGroupName(g.id)}
+              onKeyDown={e => e.key === 'Enter' && (e.currentTarget as HTMLInputElement).blur()}
+            />
             <ColorPicker
               value={g.color}
               onChange={c => previewGroupColor(g.id, c)}
