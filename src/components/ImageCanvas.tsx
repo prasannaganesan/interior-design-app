@@ -96,6 +96,8 @@ export default function ImageCanvas({ imageUrl, selectedColor, whiteBalance, lig
   const [sam, setSam] = useState<SAM2 | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [status, setStatus] = useState<string>('');
+  const showSpinner =
+    isProcessing || status.trim().endsWith('...');
   const [walls, setWalls] = useState<WallSurface[]>([]);
   const [groups, setGroups] = useState<WallGroup[]>([]);
   const [newGroupName, setNewGroupName] = useState('');
@@ -901,7 +903,7 @@ export default function ImageCanvas({ imageUrl, selectedColor, whiteBalance, lig
               border: '1px solid #ccc'
             }}
           />
-          {isProcessing && (
+          {showSpinner && (
             <div className="processing-overlay">
               <div
                 className={`spinner${!sam ? ' spinner-large' : ''}`}
