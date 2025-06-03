@@ -562,6 +562,20 @@ h2 {
   height: 16px;
 }
 
+.add-group-row {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 0.5rem;
+}
+
+.group-name-input {
+  flex: 1;
+  padding: 4px 6px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-weight: 600;
+}
+
 .group-section {
   background: #fff;
   border-radius: 6px;
