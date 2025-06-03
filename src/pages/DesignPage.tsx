@@ -64,13 +64,13 @@ export default function DesignPage() {
           />
         </div>
         <div className="color-picker-section panel-section">
-          <h2>Select Wall Color</h2>
+          <h2>Select Surface Color</h2>
           <ColorPicker
             value={selectedColor}
             onChange={setSelectedColor}
           />
           <p className="instructions">
-            Click and drag on the walls to apply the selected color
+            Hover over the image to highlight surfaces. Click to apply the color.
           </p>
         </div>
         <div className="white-balance-section panel-section">

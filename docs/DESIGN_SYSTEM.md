@@ -7,7 +7,7 @@ This document captures the visual design guidelines used across the application.
 - The application uses a **three‑pane layout** when there is enough horizontal space.
   - **Left panel** – upload and basic color controls.
   - **Center panel** – main canvas area that remains fixed.
-  - **Right panel** – dynamic widgets such as wall groups.
+  - **Right panel** – dynamic widgets such as surface groups.
 - The layout uses CSS Grid with `grid-template-columns: 320px 1fr 320px` and collapses to a single column on small screens.
 - Containers stretch to the full width of the viewport to support edge‑to‑edge designs.
 
