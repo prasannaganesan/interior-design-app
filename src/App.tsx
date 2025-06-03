@@ -13,7 +13,13 @@ export default function App() {
         <NavigationMenu onNavigate={setPage} />
         <h1>Interior Design Color Visualizer</h1>
       </header>
-      {page === 'home' ? <DesignPage /> : <WhyPage />}
+      {/* Render both pages to preserve state when navigating */}
+      <div style={{ display: page === 'home' ? 'block' : 'none' }}>
+        <DesignPage />
+      </div>
+      <div style={{ display: page === 'why' ? 'block' : 'none' }}>
+        <WhyPage />
+      </div>
     </div>
   )
 }
