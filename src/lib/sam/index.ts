@@ -191,7 +191,8 @@ export class SAM2 {
       const bestMaskIdx = scores.indexOf(Math.max(...scores));
 
       const rawMask = this.postprocessMask(masks, bestMaskIdx);
-      return this.restoreMaskToOriginal(rawMask);
+      const restored = this.restoreMaskToOriginal(rawMask);
+      return this.filterLargestComponent(restored);
     } catch (error) {
       console.error('Error in generateMask:', error);
       throw new Error(`Failed to generate mask: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -308,5 +309,59 @@ export class SAM2 {
       this.origHeight
     );
     return dstCtx.getImageData(0, 0, this.origWidth, this.origHeight);
+  }
+
+  // Remove small disconnected regions and keep the largest component
+  private filterLargestComponent(mask: ImageData): ImageData {
+    const { width, height, data } = mask;
+    const visited = new Uint8Array(width * height);
+    let bestIndices: number[] = [];
+
+    const getNeighbors = (idx: number) => {
+      const x = idx % width;
+      const y = Math.floor(idx / width);
+      const neighbors: number[] = [];
+      for (let dy = -1; dy <= 1; dy++) {
+        for (let dx = -1; dx <= 1; dx++) {
+          if (dx === 0 && dy === 0) continue;
+          const nx = x + dx;
+          const ny = y + dy;
+          if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
+            neighbors.push(ny * width + nx);
+          }
+        }
+      }
+      return neighbors;
+    };
+
+    for (let i = 0; i < width * height; i++) {
+      if (data[i * 4] === 0 || visited[i]) continue;
+      const queue: number[] = [i];
+      visited[i] = 1;
+      const indices: number[] = [i];
+      while (queue.length) {
+        const current = queue.pop() as number;
+        for (const n of getNeighbors(current)) {
+          if (data[n * 4] > 0 && !visited[n]) {
+            visited[n] = 1;
+            queue.push(n);
+            indices.push(n);
+          }
+        }
+      }
+      if (indices.length > bestIndices.length) {
+        bestIndices = indices;
+      }
+    }
+
+    const out = new Uint8ClampedArray(width * height * 4);
+    for (const idx of bestIndices) {
+      const p = idx * 4;
+      out[p] = 255;
+      out[p + 1] = 0;
+      out[p + 2] = 0;
+      out[p + 3] = 255;
+    }
+    return new ImageData(out, width, height);
   }
 }
