@@ -96,8 +96,11 @@ export default function ImageCanvas({ imageUrl, selectedColor, whiteBalance, lig
   const [sam, setSam] = useState<SAM2 | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [status, setStatus] = useState<string>('');
+  const trimmedStatus = status.trim();
   const showSpinner =
-    isProcessing || status.trim().endsWith('...');
+    isProcessing ||
+    (trimmedStatus.endsWith('...') &&
+      trimmedStatus !== 'Processing decoder output...');
   const [walls, setWalls] = useState<WallSurface[]>([]);
   const [groups, setGroups] = useState<WallGroup[]>([]);
   const [newGroupName, setNewGroupName] = useState('');
