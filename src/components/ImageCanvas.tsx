@@ -373,8 +373,31 @@ export default function ImageCanvas({ imageUrl, selectedColor, whiteBalance, lig
     }
   };
 
+  const cropMaskToBox = (
+    mask: ImageData,
+    b: { x1: number; y1: number; x2: number; y2: number }
+  ): ImageData => {
+    const { width, height, data } = mask;
+    const out = new Uint8ClampedArray(data);
+    const minX = Math.max(0, Math.min(b.x1, b.x2));
+    const maxX = Math.min(width - 1, Math.max(b.x1, b.x2));
+    const minY = Math.max(0, Math.min(b.y1, b.y2));
+    const maxY = Math.min(height - 1, Math.max(b.y1, b.y2));
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        if (x < minX || x > maxX || y < minY || y > maxY) {
+          const idx = (y * width + x) * 4;
+          out[idx] = out[idx + 1] = out[idx + 2] = 0;
+          out[idx + 3] = 0;
+        }
+      }
+    }
+    return new ImageData(out, width, height);
+  };
+
   const generateCandidates = async (
-    pts: { x: number; y: number; label: 0 | 1 }[]
+    pts: { x: number; y: number; label: 0 | 1 }[],
+    bbox?: { x1: number; y1: number; x2: number; y2: number }
   ) => {
     if (!sam) return;
     setIsProcessing(true);
@@ -385,7 +408,8 @@ export default function ImageCanvas({ imageUrl, selectedColor, whiteBalance, lig
         negativePoints: pts.filter(p => p.label === 0),
         topK: 3
       });
-      setCandidateMasks(masks);
+      const cropped = bbox ? masks.map(m => cropMaskToBox(m, bbox)) : masks;
+      setCandidateMasks(cropped);
       setCandidateIndex(0);
       setStatus('Select a candidate or add more points');
     } catch (err) {
@@ -481,10 +505,21 @@ export default function ImageCanvas({ imageUrl, selectedColor, whiteBalance, lig
         const sy = canvas.height / r.height;
         const ex = Math.round((ev.offsetX ?? 0) * sx);
         const ey = Math.round((ev.offsetY ?? 0) * sy);
-        setBox({ x1: clampedX, y1: clampedY, x2: ex, y2: ey });
+        const newBox = { x1: clampedX, y1: clampedY, x2: ex, y2: ey };
+        setBox(newBox);
         setBoxStart(null);
         window.removeEventListener('mouseup', up);
-        generateCandidates(points);
+        const center = {
+          x: Math.round((newBox.x1 + newBox.x2) / 2),
+          y: Math.round((newBox.y1 + newBox.y2) / 2),
+          label: 1 as const
+        };
+        let pts = points;
+        if (pts.length === 0) {
+          pts = [center];
+          setPoints(pts);
+        }
+        generateCandidates(pts, newBox);
       };
       window.addEventListener('mouseup', up);
       return;
@@ -838,7 +873,7 @@ export default function ImageCanvas({ imageUrl, selectedColor, whiteBalance, lig
           {candidateMasks.length > 0 && !isProcessing && (
             <div className="candidate-controls">
               <p className="instructions">
-                Click to add positive points. Hold <strong>Alt</strong> while clicking for negatives. Use <strong>B</strong> to draw a box.
+                Click to add positive points. Hold <strong>Alt</strong> while clicking for negatives. Use <strong>B</strong> to draw and release a box.
               </p>
               <div className="button-row">
                 <button
