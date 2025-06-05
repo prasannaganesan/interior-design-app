@@ -65,6 +65,13 @@ export default function ImageCanvas({ imageUrl, selectedColor, whiteBalance, lig
   const [editingGroupId, setEditingGroupId] = useState<string | null>(null);
   const surfaceCounter = useRef(1);
 
+  const [points, setPoints] = useState<{ x: number; y: number; label: 0 | 1 }[]>([]);
+  const [isBoxMode, setIsBoxMode] = useState(false);
+  const [boxStart, setBoxStart] = useState<{ x: number; y: number } | null>(null);
+  const [box, setBox] = useState<{ x1: number; y1: number; x2: number; y2: number } | null>(null);
+  const [candidateMasks, setCandidateMasks] = useState<ImageData[]>([]);
+  const [candidateIndex, setCandidateIndex] = useState(0);
+
   const retinexRef = useRef<{
     L: Float32Array;
     A: Float32Array;
@@ -252,10 +259,82 @@ export default function ImageCanvas({ imageUrl, selectedColor, whiteBalance, lig
 
   const hoverTimer = useRef<number | null>(null);
 
+  const drawCanvas = (mask?: ImageData) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    const base = history[currentHistoryIndex]?.imageData;
+    if (!base) return;
+
+    ctx.putImageData(base, 0, 0);
+    applyLighting(ctx, canvas.width, canvas.height, lighting);
+
+    if (mask) {
+      const scaledMask =
+        mask.width === canvas.width && mask.height === canvas.height
+          ? mask
+          : scaleImageData(mask, canvas.width, canvas.height);
+
+      const overlay = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const data = overlay.data;
+      const maskData = scaledMask.data;
+
+      for (let i = 0; i < data.length; i += 4) {
+        if (maskData[i] > 0) {
+          data[i] = 255;
+          data[i + 1] = 255;
+          data[i + 2] = 255;
+          data[i + 3] = 128;
+        }
+      }
+
+      ctx.putImageData(overlay, 0, 0);
+    }
+
+    // Draw points
+    for (const p of points) {
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, 4, 0, Math.PI * 2);
+      ctx.fillStyle = p.label === 1 ? 'rgba(0,255,0,0.9)' : 'rgba(255,0,0,0.9)';
+      ctx.fill();
+      ctx.strokeStyle = '#000';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    }
+
+    if (box) {
+      const x = Math.min(box.x1, box.x2);
+      const y = Math.min(box.y1, box.y2);
+      const w = Math.abs(box.x2 - box.x1);
+      const h = Math.abs(box.y2 - box.y1);
+      ctx.save();
+      ctx.strokeStyle = 'rgba(0,0,255,0.9)';
+      ctx.setLineDash([4, 2]);
+      ctx.strokeRect(x, y, w, h);
+      ctx.restore();
+    }
+  };
 
   const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
     if (!canvas || !sam) {
+      return;
+    }
+
+    if (boxStart) {
+      const rect = canvas.getBoundingClientRect();
+      const scaleX = canvas.width / rect.width;
+      const scaleY = canvas.height / rect.height;
+      const x = Math.round(e.nativeEvent.offsetX * scaleX);
+      const y = Math.round(e.nativeEvent.offsetY * scaleY);
+      setBox({ x1: boxStart.x, y1: boxStart.y, x2: x, y2: y });
+      drawCanvas(candidateMasks[candidateIndex]);
+      return;
+    }
+
+    if (points.length || candidateMasks.length) {
+      drawCanvas(candidateMasks[candidateIndex]);
       return;
     }
 
@@ -274,42 +353,11 @@ export default function ImageCanvas({ imageUrl, selectedColor, whiteBalance, lig
     hoverTimer.current = window.setTimeout(async () => {
       try {
         const mask = await sam.generateMask({ x: clampedX, y: clampedY });
-        showHoverMask(mask);
+        drawCanvas(mask);
       } catch (err) {
         console.error('Failed to generate hover mask', err);
       }
     }, 150);
-  };
-
-  const showHoverMask = (mask: ImageData) => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-    const base = history[currentHistoryIndex]?.imageData;
-    if (!base) return;
-
-    ctx.putImageData(base, 0, 0);
-    applyLighting(ctx, canvas.width, canvas.height, lighting);
-    const scaledMask =
-      mask.width === canvas.width && mask.height === canvas.height
-        ? mask
-        : scaleImageData(mask, canvas.width, canvas.height);
-
-    const overlay = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    const data = overlay.data;
-    const maskData = scaledMask.data;
-
-    for (let i = 0; i < data.length; i += 4) {
-      if (maskData[i] > 0) {
-        data[i] = 255;
-        data[i + 1] = 255;
-        data[i + 2] = 255;
-        data[i + 3] = 128;
-      }
-    }
-
-    ctx.putImageData(overlay, 0, 0);
   };
 
   const clearHover = () => {
@@ -317,96 +365,134 @@ export default function ImageCanvas({ imageUrl, selectedColor, whiteBalance, lig
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
-    const base = history[currentHistoryIndex]?.imageData;
-    if (base) {
-      ctx.putImageData(base, 0, 0);
-      applyLighting(ctx, canvas.width, canvas.height, lighting);
-    }
+    drawCanvas(candidateMasks[candidateIndex]);
     if (hoverTimer.current) {
       clearTimeout(hoverTimer.current);
       hoverTimer.current = null;
     }
   };
 
-  const handleMouseDown = async (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (!sam || isProcessing) return;
-
-    // Cancel any pending hover highlight
-    clearHover();
-
-    const canvas = canvasRef.current;
-    if (!canvas || !originalImageData) return;
-
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
+  const generateCandidates = async (
+    pts: { x: number; y: number; label: 0 | 1 }[]
+  ) => {
+    if (!sam) return;
     setIsProcessing(true);
     setStatus('Generating mask...');
-
     try {
-      const rect = canvas.getBoundingClientRect();
-      const scaleX = canvas.width / rect.width;
-      const scaleY = canvas.height / rect.height;
-      const x = Math.round(e.nativeEvent.offsetX * scaleX);
-      const y = Math.round(e.nativeEvent.offsetY * scaleY);
-
-      const clampedX = Math.min(Math.max(x, 0), canvas.width - 1);
-      const clampedY = Math.min(Math.max(y, 0), canvas.height - 1);
-
-      // Generate mask for clicked point
-      const mask = await sam.generateMask({ x: clampedX, y: clampedY });
-
-      // Scale mask to canvas size if needed
-      const scaledMask =
-        mask.width === canvas.width && mask.height === canvas.height
-          ? mask
-          : scaleImageData(mask, canvas.width, canvas.height);
-      const indices = maskToIndices(scaledMask);
-      let historyImage: ImageData | undefined;
-      if (baseImageData) {
-        const updated = new ImageData(
-          new Uint8ClampedArray(baseImageData.data),
-          baseImageData.width,
-          baseImageData.height
-        );
-        if (algorithm === 'intrinsic' && intrinsicRef.current) {
-          applyReflectanceColor(
-            updated,
-            {
-              R: intrinsicRef.current.R,
-              S: intrinsicRef.current.S,
-              E: intrinsicRef.current.E
-            },
-            indices,
-            selectedColor
-          );
-        } else if (retinexRef.current) {
-          applyRetinexRecolor(updated, indices, selectedColor, retinexRef.current);
-        }
-        setBaseImageData(updated);
-        ctx.putImageData(updated, 0, 0);
-        applyLighting(ctx, canvas.width, canvas.height, lighting);
-        historyImage = updated;
-      }
-
-        const newWall: WallSurface = {
-          id: `Surface ${surfaceCounter.current++}`,
-          pixels: indices,
-          color: selectedColor,
-          enabled: true,
-          groupId: null
-        };
-      setWalls([...walls, newWall]);
-
-      // Save to history
-      saveToHistory(historyImage);
-      setStatus('Ready');
-    } catch (error) {
-      console.error('Failed to generate/apply mask:', error);
+      const masks = await sam.generateMasks({
+        positivePoints: pts.filter(p => p.label === 1),
+        negativePoints: pts.filter(p => p.label === 0),
+        topK: 3
+      });
+      setCandidateMasks(masks);
+      setCandidateIndex(0);
+    } catch (err) {
+      console.error('Failed to generate mask', err);
       setStatus('Failed to generate mask');
     } finally {
       setTimeout(() => setIsProcessing(false), 100);
     }
+  };
+
+  const applyCandidate = (mask: ImageData) => {
+    const canvas = canvasRef.current;
+    if (!canvas || !originalImageData) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const scaledMask =
+      mask.width === canvas.width && mask.height === canvas.height
+        ? mask
+        : scaleImageData(mask, canvas.width, canvas.height);
+    const indices = maskToIndices(scaledMask);
+    let historyImage: ImageData | undefined;
+    if (baseImageData) {
+      const updated = new ImageData(
+        new Uint8ClampedArray(baseImageData.data),
+        baseImageData.width,
+        baseImageData.height
+      );
+      if (algorithm === 'intrinsic' && intrinsicRef.current) {
+        applyReflectanceColor(
+          updated,
+          {
+            R: intrinsicRef.current.R,
+            S: intrinsicRef.current.S,
+            E: intrinsicRef.current.E
+          },
+          indices,
+          selectedColor
+        );
+      } else if (retinexRef.current) {
+        applyRetinexRecolor(updated, indices, selectedColor, retinexRef.current);
+      }
+      setBaseImageData(updated);
+      ctx.putImageData(updated, 0, 0);
+      applyLighting(ctx, canvas.width, canvas.height, lighting);
+      historyImage = updated;
+    }
+
+    const newWall: WallSurface = {
+      id: `Surface ${surfaceCounter.current++}`,
+      pixels: indices,
+      color: selectedColor,
+      enabled: true,
+      groupId: null
+    };
+    setWalls([...walls, newWall]);
+    saveToHistory(historyImage);
+    setStatus('Ready');
+  };
+
+  const clearSelections = () => {
+    setPoints([]);
+    setBox(null);
+    setBoxStart(null);
+    setCandidateMasks([]);
+    setCandidateIndex(0);
+    drawCanvas();
+  };
+
+  const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (!sam || isProcessing) return;
+
+    clearHover();
+
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    const x = Math.round(e.nativeEvent.offsetX * scaleX);
+    const y = Math.round(e.nativeEvent.offsetY * scaleY);
+
+    const clampedX = Math.min(Math.max(x, 0), canvas.width - 1);
+    const clampedY = Math.min(Math.max(y, 0), canvas.height - 1);
+
+    if (isBoxMode) {
+      setBoxStart({ x: clampedX, y: clampedY });
+      setBox({ x1: clampedX, y1: clampedY, x2: clampedX, y2: clampedY });
+      const up = (ev: MouseEvent) => {
+        const r = canvas.getBoundingClientRect();
+        const sx = canvas.width / r.width;
+        const sy = canvas.height / r.height;
+        const ex = Math.round((ev.offsetX ?? 0) * sx);
+        const ey = Math.round((ev.offsetY ?? 0) * sy);
+        setBox({ x1: clampedX, y1: clampedY, x2: ex, y2: ey });
+        setBoxStart(null);
+        window.removeEventListener('mouseup', up);
+        generateCandidates(points);
+      };
+      window.addEventListener('mouseup', up);
+      return;
+    }
+
+    const label: 0 | 1 = e.altKey ? 0 : 1;
+    const newPoint = { x: clampedX, y: clampedY, label };
+    const pts = [...points, newPoint];
+    setPoints(pts);
+    generateCandidates(pts);
   };
 
 
@@ -677,6 +763,12 @@ export default function ImageCanvas({ imageUrl, selectedColor, whiteBalance, lig
     applyLighting(ctx, canvas.width, canvas.height, lighting);
   }, [lighting, baseImageData]);
 
+  useEffect(() => {
+    if (candidateMasks.length) {
+      drawCanvas(candidateMasks[candidateIndex]);
+    }
+  }, [candidateMasks, candidateIndex]);
+
 
   return (
     <div className="canvas-wrapper">
@@ -700,6 +792,14 @@ export default function ImageCanvas({ imageUrl, selectedColor, whiteBalance, lig
             <button title="Reset" onClick={reset} disabled={isProcessing}>
               <ResetIcon />
             </button>
+            <button
+              title="Toggle Box Mode (B)"
+              onClick={() => setIsBoxMode(!isBoxMode)}
+              className={isBoxMode ? 'active' : ''}
+            >
+              Box
+            </button>
+            <button title="Clear" onClick={clearSelections}>X</button>
           </div>
           <canvas
             ref={canvasRef}
@@ -719,6 +819,29 @@ export default function ImageCanvas({ imageUrl, selectedColor, whiteBalance, lig
                 className={`spinner${!sam ? ' spinner-large' : ''}`}
               />
               <span>{status}</span>
+            </div>
+          )}
+          {candidateMasks.length > 0 && !isProcessing && (
+            <div className="candidate-controls">
+              <button
+                onClick={() =>
+                  setCandidateIndex((candidateIndex + candidateMasks.length - 1) % candidateMasks.length)
+                }
+              >
+                &lt;
+              </button>
+              <span>
+                {candidateIndex + 1}/{candidateMasks.length}
+              </span>
+              <button
+                onClick={() =>
+                  setCandidateIndex((candidateIndex + 1) % candidateMasks.length)
+                }
+              >
+                &gt;
+              </button>
+              <button onClick={() => applyCandidate(candidateMasks[candidateIndex])}>Apply</button>
+              <button onClick={clearSelections}>Cancel</button>
             </div>
           )}
         </div>
