@@ -711,11 +711,23 @@ h2 {
   bottom: 8px;
   left: 8px;
   display: flex;
+  flex-direction: column;
   gap: 4px;
   background: rgba(255, 255, 255, 0.8);
   padding: 4px;
   border-radius: 6px;
   z-index: 10;
+}
+
+.candidate-controls .button-row {
+  display: flex;
+  gap: 4px;
+}
+
+.candidate-controls .instructions {
+  margin: 0;
+  font-size: 0.8rem;
+  font-style: italic;
 }
 
 .candidate-controls button {

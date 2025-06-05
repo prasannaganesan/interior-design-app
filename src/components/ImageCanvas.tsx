@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { UndoIcon, RedoIcon, ResetIcon } from './Icons';
 import { SAM2 } from '../lib/sam';
@@ -53,11 +53,7 @@ export default function ImageCanvas({ imageUrl, selectedColor, whiteBalance, lig
   const [niid, setNiid] = useState<NIIDNet | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [status, setStatus] = useState<string>('');
-  const trimmedStatus = status.trim();
-  const showSpinner =
-    isProcessing ||
-    (trimmedStatus.endsWith('...') &&
-      trimmedStatus !== 'Processing decoder output...');
+  const showSpinner = isProcessing;
   const [walls, setWalls] = useState<WallSurface[]>([]);
   const [groups, setGroups] = useState<WallGroup[]>([]);
   const [newGroupName, setNewGroupName] = useState('');
@@ -259,7 +255,7 @@ export default function ImageCanvas({ imageUrl, selectedColor, whiteBalance, lig
 
   const hoverTimer = useRef<number | null>(null);
 
-  const drawCanvas = (mask?: ImageData) => {
+  const drawCanvas = useCallback((mask?: ImageData) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
@@ -314,7 +310,7 @@ export default function ImageCanvas({ imageUrl, selectedColor, whiteBalance, lig
       ctx.strokeRect(x, y, w, h);
       ctx.restore();
     }
-  };
+  }, [history, currentHistoryIndex, lighting, points, box]);
 
   const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
@@ -386,6 +382,7 @@ export default function ImageCanvas({ imageUrl, selectedColor, whiteBalance, lig
       });
       setCandidateMasks(masks);
       setCandidateIndex(0);
+      setStatus('Select a candidate or add more points');
     } catch (err) {
       console.error('Failed to generate mask', err);
       setStatus('Failed to generate mask');
@@ -444,14 +441,14 @@ export default function ImageCanvas({ imageUrl, selectedColor, whiteBalance, lig
     setStatus('Ready');
   };
 
-  const clearSelections = () => {
+  const clearSelections = useCallback(() => {
     setPoints([]);
     setBox(null);
     setBoxStart(null);
     setCandidateMasks([]);
     setCandidateIndex(0);
     drawCanvas();
-  };
+  }, [drawCanvas]);
 
   const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
     if (!sam || isProcessing) return;
@@ -767,7 +764,19 @@ export default function ImageCanvas({ imageUrl, selectedColor, whiteBalance, lig
     if (candidateMasks.length) {
       drawCanvas(candidateMasks[candidateIndex]);
     }
-  }, [candidateMasks, candidateIndex]);
+  }, [candidateMasks, candidateIndex, drawCanvas]);
+
+  useEffect(() => {
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'b' || e.key === 'B') {
+        setIsBoxMode(v => !v);
+      } else if (e.key === 'Escape') {
+        clearSelections();
+      }
+    };
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  }, [clearSelections]);
 
 
   return (
@@ -823,25 +832,30 @@ export default function ImageCanvas({ imageUrl, selectedColor, whiteBalance, lig
           )}
           {candidateMasks.length > 0 && !isProcessing && (
             <div className="candidate-controls">
-              <button
-                onClick={() =>
-                  setCandidateIndex((candidateIndex + candidateMasks.length - 1) % candidateMasks.length)
-                }
-              >
-                &lt;
-              </button>
-              <span>
-                {candidateIndex + 1}/{candidateMasks.length}
-              </span>
-              <button
-                onClick={() =>
-                  setCandidateIndex((candidateIndex + 1) % candidateMasks.length)
-                }
-              >
-                &gt;
-              </button>
-              <button onClick={() => applyCandidate(candidateMasks[candidateIndex])}>Apply</button>
-              <button onClick={clearSelections}>Cancel</button>
+              <p className="instructions">
+                Click to add positive points. Hold <strong>Alt</strong> while clicking for negatives. Use <strong>B</strong> to draw a box.
+              </p>
+              <div className="button-row">
+                <button
+                  onClick={() =>
+                    setCandidateIndex((candidateIndex + candidateMasks.length - 1) % candidateMasks.length)
+                  }
+                >
+                  &lt;
+                </button>
+                <span>
+                  {candidateIndex + 1}/{candidateMasks.length}
+                </span>
+                <button
+                  onClick={() =>
+                    setCandidateIndex((candidateIndex + 1) % candidateMasks.length)
+                  }
+                >
+                  &gt;
+                </button>
+                <button onClick={() => applyCandidate(candidateMasks[candidateIndex])}>Apply</button>
+                <button onClick={clearSelections}>Cancel</button>
+              </div>
             </div>
           )}
         </div>
