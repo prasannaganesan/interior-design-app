@@ -73,7 +73,7 @@ export default function DesignPage() {
             onChange={setSelectedColor}
           />
           <p className="instructions">
-            Hover over the image to highlight surfaces. Click to apply the color.
+            Hover to preview surfaces. Click to add points; hold <strong>Alt</strong> for negatives. Toggle <strong>Box</strong> (or press <strong>B</strong>) then drag and release to draw a rectangle. Use the arrows under the image to choose a mask then Apply.
           </p>
         </div>
         <div className="white-balance-section panel-section">

@@ -199,6 +199,89 @@ export class SAM2 {
     }
   }
 
+  async generateMasks(config: {
+    positivePoints: { x: number; y: number }[];
+    negativePoints?: { x: number; y: number }[];
+    topK?: number;
+  }) {
+    if (!this.decoderSession) {
+      throw new Error("SAM2 not initialized - decoder session is null");
+    }
+    if (!this.imageEmbedding) {
+      throw new Error(
+        "No image embeddings available - call generateEmbedding first"
+      );
+    }
+
+    const neg = config.negativePoints ?? [];
+    const points = [...config.positivePoints, ...neg];
+    const labels = [
+      ...config.positivePoints.map(() => 1),
+      ...neg.map(() => 0)
+    ];
+    if (points.length === 0) {
+      throw new Error("No points provided");
+    }
+
+    const coordsArr: number[] = [];
+    for (const p of points) {
+      const scaledX = p.x * this.scale + this.offsetX;
+      const scaledY = p.y * this.scale + this.offsetY;
+      coordsArr.push(scaledX, scaledY);
+    }
+
+    const pointCoords = new ort.Tensor(
+      "float32",
+      Float32Array.from(coordsArr),
+      [1, points.length, 2]
+    );
+    const pointLabels = new ort.Tensor(
+      "float32",
+      Float32Array.from(labels),
+      [1, labels.length]
+    );
+
+    const maskInput = new ort.Tensor(
+      "float32",
+      new Float32Array(256 * 256),
+      [1, 1, 256, 256]
+    );
+    const hasMaskInput = new ort.Tensor("float32", [0], [1]);
+    const origImSize = new ort.Tensor(
+      "int32",
+      [this.origHeight, this.origWidth],
+      [2]
+    );
+
+    const feeds = {
+      image_embed: this.imageEmbedding.image_embed,
+      high_res_feats_0: this.imageEmbedding.high_res_feats_0,
+      high_res_feats_1: this.imageEmbedding.high_res_feats_1,
+      point_coords: pointCoords,
+      point_labels: pointLabels,
+      mask_input: maskInput,
+      has_mask_input: hasMaskInput,
+      orig_im_size: origImSize
+    };
+
+    const result = await this.decoderSession.run(feeds);
+
+    if (!result.masks || !result.iou_predictions) {
+      throw new Error("Decoder failed to produce valid output");
+    }
+
+    const masks = result.masks;
+    const k = masks.dims[1];
+    const num = Math.min(config.topK ?? k, k);
+    const out: ImageData[] = [];
+    for (let i = 0; i < num; i++) {
+      const rawMask = this.postprocessMask(masks, i);
+      const restored = this.restoreMaskToOriginal(rawMask);
+      out.push(this.filterLargestComponent(restored));
+    }
+    return out;
+  }
+
   private async preprocessImage(imageData: ImageData): Promise<{ tensor: ort.Tensor; scale: number; offsetX: number; offsetY: number }> {
     try {
       // Create a canvas to resize the image
