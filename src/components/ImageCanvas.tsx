@@ -19,7 +19,7 @@ import {
 } from '../lib/imageUtils';
 
 import GroupsSidebar from './GroupsSidebar';
-import { WallGroup, WallSurface } from '../types/wall';
+import type { WallGroup, WallSurface } from '../types/wall';
 
 import { type WhiteBalance } from './WhiteBalanceControls';
 
@@ -39,19 +39,7 @@ interface HistoryState {
 }
 
 
-interface WallSurface {
-  id: string;
-  pixels: Uint32Array;
-  color: string;
-  enabled: boolean;
-  groupId: string | null;
-}
 
-interface WallGroup {
-  id: string;
-  name: string;
-  color: string;
-}
 
 
 export default function ImageCanvas({ imageUrl, selectedColor, whiteBalance, lighting, algorithm, sidebarContainer }: ImageCanvasProps) {

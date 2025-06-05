@@ -1,7 +1,7 @@
 import ColorPicker from './ColorPicker';
 import { PlusIcon, TrashIcon } from './Icons';
-import { WallGroup, WallSurface } from '../types/wall';
-import { Dispatch, SetStateAction } from 'react';
+import type { WallGroup, WallSurface } from '../types/wall';
+import type { Dispatch, SetStateAction } from 'react';
 
 interface GroupsSidebarProps {
   groups: WallGroup[];
