@@ -53,7 +53,12 @@ export default function ImageCanvas({ imageUrl, selectedColor, whiteBalance, lig
   const [niid, setNiid] = useState<NIIDNet | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [status, setStatus] = useState<string>('');
-  const showSpinner = isProcessing;
+  const trimmedStatus = status.trim();
+  const showSpinner =
+    isProcessing ||
+    (trimmedStatus.endsWith('...') &&
+      trimmedStatus !== 'Processing decoder output...' &&
+      trimmedStatus !== 'Building mask...');
   const [walls, setWalls] = useState<WallSurface[]>([]);
   const [groups, setGroups] = useState<WallGroup[]>([]);
   const [newGroupName, setNewGroupName] = useState('');
