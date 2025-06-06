@@ -1,19 +1,11 @@
 
+import { LIGHTING_PRESETS } from '../constants/lighting-presets';
+
 interface LightingSelectorProps {
   value: string;
   onChange: (mode: string) => void;
   className?: string;
 }
-
-export const LIGHTING_PRESETS = {
-  normal: 'Normal',
-  morning: 'Morning Sun',
-  afternoon: 'Afternoon Sun',
-  evening: 'Evening',
-  night: 'Night Lights (LED)',
-  cloudy: 'Cloudy Day'
-};
-
 export default function LightingSelector({ value, onChange, className }: LightingSelectorProps) {
   return (
     <div className={`lighting-selector ${className ?? ''}`.trim()}>
