@@ -128,7 +128,7 @@ export default function ColorPicker({ value, onChange, onChangeComplete }: Color
     setHSV(newHSV);
     setHexInput(value.toUpperCase());
     setRgb(hexToRGB(value));
-  }, [value]);
+  }, [value, hsv.h]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
